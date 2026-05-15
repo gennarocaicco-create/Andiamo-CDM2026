@@ -874,15 +874,40 @@ function NotifAdmin({players,results,leaderboard,prevLeaderboard}){
   const[custom,setCustom]=useState("");
   const[sent,setSent]=useState([]);
   const[sending,setSending]=useState(false);
+  const[allNotifs,setAllNotifs]=useState([]);
+  const[editId,setEditId]=useState(null);
+  const[editMsg,setEditMsg]=useState("");
+
+  useEffect(()=>{
+    sg("notifs",[]).then(n=>setAllNotifs(n||[]));
+  },[]);
+
   const sendNotif=async(msg)=>{
     if(!msg.trim())return;
     setSending(true);
     const notif={msg,ts:new Date().toISOString(),id:Date.now()};
     const prev=await sg("notifs",[]);
-    await ss("notifs",[notif,...(prev||[])].slice(0,50));
+    const updated=[notif,...(prev||[])].slice(0,50);
+    await ss("notifs",updated);
     setSent(p=>[notif,...p]);
+    setAllNotifs(updated);
     setSending(false);
     setCustom("");
+  };
+
+  const deleteNotif=async(id)=>{
+    const updated=allNotifs.filter(n=>n.id!==id);
+    await ss("notifs",updated);
+    setAllNotifs(updated);
+  };
+
+  const startEdit=(n)=>{setEditId(n.id);setEditMsg(n.msg);};
+  const saveEdit=async()=>{
+    const updated=allNotifs.map(n=>n.id===editId?{...n,msg:editMsg}:n);
+    await ss("notifs",updated);
+    setAllNotifs(updated);
+    setEditId(null);setEditMsg("");
+  };
   };
   const suggestions=[];
   if(leaderboard.length>0){
@@ -942,11 +967,34 @@ function NotifAdmin({players,results,leaderboard,prevLeaderboard}){
           </div>
         )}
       </div>
-      {sent.length>0&&(
+      {allNotifs.length>0&&(
         <div style={{background:T.card,borderRadius:14,padding:20,border:`1px solid ${T.border}`}}>
-          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:700,color:T.gold,marginBottom:12}}>📋 Envoyées cette session</div>
+          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:700,color:T.gold,marginBottom:12}}>📋 Notifications envoyées ({allNotifs.length})</div>
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
-            {sent.map(n=>(<div key={n.id} style={{background:T.card2,borderRadius:8,padding:"8px 12px",fontSize:13,color:T.text,border:`1px solid ${T.border}`}}><div style={{marginBottom:2}}>{n.msg}</div><div style={{fontSize:11,color:T.muted}}>{new Date(n.ts).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"})}</div></div>))}
+            {allNotifs.map(n=>(
+              <div key={n.id} style={{background:T.card2,borderRadius:8,padding:"10px 12px",fontSize:13,color:T.text,border:`1px solid ${T.border}`}}>
+                {editId===n.id?(
+                  <div>
+                    <textarea value={editMsg} onChange={e=>setEditMsg(e.target.value)} rows={2} style={{width:"100%",background:"#111b2d",border:`1px solid ${T.blue}`,borderRadius:8,padding:"8px",color:"#fff",fontFamily:"Inter,sans-serif",fontSize:13,outline:"none",resize:"vertical",marginBottom:8}}/>
+                    <div style={{display:"flex",gap:8}}>
+                      <button onClick={saveEdit} style={{background:T.green,color:"#fff",border:"none",borderRadius:6,padding:"6px 14px",fontSize:12,fontWeight:600,cursor:"pointer"}}>✓ Sauvegarder</button>
+                      <button onClick={()=>setEditId(null)} style={{background:T.card,color:T.muted,border:`1px solid ${T.border}`,borderRadius:6,padding:"6px 14px",fontSize:12,cursor:"pointer"}}>Annuler</button>
+                    </div>
+                  </div>
+                ):(
+                  <div>
+                    <div style={{marginBottom:6,lineHeight:1.5}}>{n.msg}</div>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                      <div style={{fontSize:11,color:T.muted}}>{new Date(n.ts).toLocaleDateString("fr-FR",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"})}</div>
+                      <div style={{display:"flex",gap:6}}>
+                        <button onClick={()=>startEdit(n)} style={{background:T.card,color:T.blue,border:`1px solid ${T.blue}44`,borderRadius:6,padding:"4px 10px",fontSize:11,cursor:"pointer"}}>✏️ Modifier</button>
+                        <button onClick={()=>deleteNotif(n.id)} style={{background:T.card,color:T.red,border:`1px solid ${T.red}44`,borderRadius:6,padding:"4px 10px",fontSize:11,cursor:"pointer"}}>🗑️ Supprimer</button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         </div>
       )}
