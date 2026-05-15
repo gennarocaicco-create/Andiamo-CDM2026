@@ -878,8 +878,8 @@ function NotifAdmin({players,results,leaderboard,prevLeaderboard}){
     if(!msg.trim())return;
     setSending(true);
     const notif={msg,ts:new Date().toISOString(),id:Date.now()};
-    const prev=await sg("wc26_notifs",[]);
-    await ss("wc26_notifs",[notif,...(prev||[])].slice(0,50));
+    const prev=await sg("notifs",[]);
+    await ss("notifs",[notif,...(prev||[])].slice(0,50));
     setSent(p=>[notif,...p]);
     setSending(false);
     setCustom("");
@@ -963,7 +963,7 @@ function ResetPasswordAdmin({players}){
 
   const handleReset=async()=>{
     if(!selected||!newPwd.trim()){setMsg("⚠ Choisis un participant et un nouveau mot de passe.");return;}
-    await ss(`wc26_pwd_${selected}`,newPwd.trim());
+    await ss(`passwords/${selected}`,newPwd.trim());
     setMsg(`✓ Mot de passe de ${selected} réinitialisé !`);
     setNewPwd("");setSelected("");
     setTimeout(()=>setMsg(""),3000);
@@ -1051,7 +1051,7 @@ Si aucun match n'est terminé, réponds : {"results":[]}`;
       }
       const updated = { ...results, grp };
       setResults(updated);
-      await ss("wc26_results", updated);
+      await ss("results", updated);
       setSyncMsg(`✓ ${count} résultat${count>1?"s":""} mis à jour automatiquement !`);
     } catch(e) {
       setSyncMsg(`⚠ Erreur : ${e.message}. Réessayez dans quelques instants.`);
@@ -1089,7 +1089,7 @@ Si aucun match n'est terminé, réponds : {"results":[]}`;
       }
       const updated = { ...results, ko };
       setResults(updated);
-      await ss("wc26_results", updated);
+      await ss("results", updated);
       setSyncMsg(`✓ ${count} résultat${count>1?"s":""} de phase finale mis à jour !`);
     } catch(e) {
       setSyncMsg(`⚠ Erreur : ${e.message}. Réessayez.`);
@@ -1253,7 +1253,7 @@ function App(){
 
   useEffect(()=>{
     (async()=>{
-      const[pl,res,set,ko,nf]=await Promise.all([sg("wc26_players",{}),sg("wc26_results",{grp:{},ko:{}}),sg("wc26_settings",{phase:"groups",bonusResults:{}}),sg("wc26_ko_matches",{}),sg("wc26_notifs",[])]);
+      const[pl,res,set,ko,nf]=await Promise.all([sg("players",{}),sg("results",{grp:{},ko:{}}),sg("settings",{phase:"groups",bonusResults:{}}),sg("koMatches",{}),sg("notifs",[])]);
       setPlayers(pl);setResults(res);setSettings(set);setKoMatches(ko);setNotifs(nf||[]);setLoading(false);
       setSchedule(SCHEDULE);
       setScheduleLoading(false);
@@ -1262,7 +1262,7 @@ function App(){
         const savedPseudo = localStorage.getItem("wc26_my_pseudo");
         const savedPwd = localStorage.getItem("wc26_my_pwd");
         if (savedPseudo && savedPwd && savedPseudo !== "__admin") {
-          const storedPwd = await sg(`wc26_pwd_${savedPseudo}`, null);
+          const storedPwd = await sg(`passwords/${savedPseudo}`, null);
           if (!storedPwd || storedPwd === savedPwd) {
             setPseudo(savedPseudo);
             setPage("groups");
@@ -1274,11 +1274,11 @@ function App(){
 
   useEffect(()=>{
     if(!pseudo||pseudo==="__admin")return;
-    sg(`wc26_p_${pseudo}`,{grp:{},ko:{},bonus:{}}).then(p=>setPreds(p||{grp:{},ko:{},bonus:{}}));
+    sg(`predictions/${pseudo}`,{grp:{},ko:{},bonus:{}}).then(p=>setPreds(p||{grp:{},ko:{},bonus:{}}));
   },[pseudo]);
 
   useEffect(()=>{
-    const poll=async()=>{const nf=await sg("wc26_notifs",[]);if(nf)setNotifs(nf);};
+    const poll=async()=>{const nf=await sg("notifs",[]);if(nf)setNotifs(nf);};
     const interval=setInterval(poll,30000);
     return()=>clearInterval(interval);
   },[]);
@@ -1290,7 +1290,7 @@ function App(){
     saveTimer.current=setTimeout(async()=>{
       const p=pseudoRef.current;
       if(!p||p==="__admin")return;
-      await ss(`wc26_p_${p}`,predsRef.current);
+      await ss(`predictions/${p}`,predsRef.current);
       setSaved("✓ Sauvegardé");
       setTimeout(()=>setSaved(""),2000);
     },800);
@@ -1308,7 +1308,7 @@ function App(){
 
   const handleJoin=async(name, pwd)=>{
     if(name==="__admin")return;
-    const existingPwd = await sg(`wc26_pwd_${name}`, null);
+    const existingPwd = await sg(`passwords/${name}`, null);
     if(existingPwd){
       // Joueur existant → vérifier le mot de passe
       if(existingPwd !== pwd){
@@ -1319,8 +1319,8 @@ function App(){
       // Nouveau joueur → créer le compte avec son mot de passe
       const np={...players,[name]:{joinedAt:new Date().toISOString()}};
       setPlayers(np);
-      await ss("wc26_players",np);
-      await ss(`wc26_pwd_${name}`, pwd);
+      await ss("players",np);
+      await ss(`passwords/${name}`, pwd);
     }
     try{localStorage.setItem("wc26_my_pseudo",name);localStorage.setItem("wc26_my_pwd",pwd);}catch{}
     setPseudo(name);setPage("groups");
@@ -1330,32 +1330,32 @@ function App(){
 
   const saveResult=async(type,id,h,a)=>{
     const updated={...results,[type]:{...results[type],[id]:{h,a}}};
-    setResults(updated);await ss("wc26_results",updated);
+    setResults(updated);await ss("results",updated);
   };
   const deleteResult=async(type,id)=>{
     const updated={...results,[type]:{...results[type]}};delete updated[type][id];
-    setResults(updated);await ss("wc26_results",updated);
+    setResults(updated);await ss("results",updated);
   };
   const saveSettings=async(upd)=>{
     const ns={...settings,...upd};
     if(upd.bonusResults)ns.bonusResults={...settings.bonusResults,...upd.bonusResults};
-    setSettings(ns);await ss("wc26_settings",ns);
+    setSettings(ns);await ss("settings",ns);
   };
   const addKoMatch=async(round,h,a)=>{
     const prev=koMatches[round]||[];
     const id=`KO${round.substring(0,3).replace(/\s/g,"")}${prev.length+1}`;
     const updated={...koMatches,[round]:[...prev,{id,h,a}]};
-    setKoMatches(updated);await ss("wc26_ko_matches",updated);
+    setKoMatches(updated);await ss("koMatches",updated);
   };
   const removeKoMatch=async(round,id)=>{
     const updated={...koMatches,[round]:(koMatches[round]||[]).filter(m=>m.id!==id)};
-    setKoMatches(updated);await ss("wc26_ko_matches",updated);
+    setKoMatches(updated);await ss("koMatches",updated);
   };
 
   const loadLeaderboard=useCallback(async()=>{
     setLbLoading(true);
     const board=await Promise.all(Object.keys(playersRef.current).map(async p=>{
-      const pd=await sg(`wc26_p_${p}`,{grp:{},ko:{},bonus:{}});
+      const pd=await sg(`predictions/${p}`,{grp:{},ko:{},bonus:{}});
       const score=calcScore(pd,resultsRef.current,koMatchesRef.current,settingsRef.current.bonusResults);
       return{pseudo:p,score,preds:pd};
     }));
