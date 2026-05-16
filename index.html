@@ -11,11 +11,12 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <meta name="version" content="2.1">
+  <meta name="version" content="2.2">
   <link rel="manifest" href="manifest.json">
   <!-- Firebase -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js"></script>
   <!-- React -->
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -24,7 +25,6 @@
 <body>
 <div id="root"></div>
 <script>
-  // Firebase config
   const firebaseConfig = {
     apiKey: "AIzaSyCM1r38ceXGQz7az9CRhHRZyvTrdhkTVIQ",
     authDomain: "andiamocdm26.firebaseapp.com",
@@ -37,6 +37,40 @@
   firebase.initializeApp(firebaseConfig);
   const DB = firebase.database();
   const dbRef = path => DB.ref('wc26/' + path);
+  const MESSAGING = firebase.messaging();
+  const VAPID_KEY = "vCz4ZR9hZnTw-utvXvC7dI0-CdCm-p64dITWUes2RxA";
+
+  // Enregistrement du Service Worker pour les notifications push
+  async function registerSW() {
+    if (!('serviceWorker' in navigator)) return;
+    try {
+      const reg = await navigator.serviceWorker.register('firebase-messaging-sw.js');
+      MESSAGING.useServiceWorker(reg);
+    } catch(e) { console.log('SW:', e); }
+  }
+  registerSW();
+
+  // Demander la permission et récupérer le token FCM
+  async function requestNotifPermission(pseudo) {
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') return;
+      const token = await MESSAGING.getToken({ vapidKey: VAPID_KEY });
+      if (token && pseudo) {
+        await DB.ref(`wc26/fcm_tokens/${pseudo}`).set(token);
+      }
+    } catch(e) { console.log('FCM:', e); }
+  }
+
+  // Envoyer une notification via Firebase Functions (ou Realtime DB trigger)
+  async function sendPushNotification(msg) {
+    try {
+      const snap = await DB.ref('wc26/fcm_tokens').once('value');
+      const tokens = snap.val() || {};
+      // On stocke le message dans Firebase — le service worker le récupère
+      await DB.ref('wc26/push_queue').push({ msg, ts: Date.now() });
+    } catch(e) { console.log('Push:', e); }
+  }
 </script>
 <script type="text/babel">
 const { useState, useEffect, useRef, useCallback } = React;
@@ -902,6 +936,8 @@ function NotifAdmin({players,results,leaderboard,prevLeaderboard}){
     const prev=await sg("notifs",[]);
     const updated=[notif,...(prev||[])].slice(0,50);
     await ss("notifs",updated);
+    // Envoyer push notification
+    try{ await sendPushNotification(msg); }catch(e){ console.log('push err',e); }
     setSent(p=>[notif,...p]);
     setAllNotifs(updated);
     setSending(false);
@@ -1495,6 +1531,8 @@ function App(){
     }
     try{localStorage.setItem("wc26_my_pseudo",name);localStorage.setItem("wc26_my_pwd",pwd);}catch{}
     setPseudo(name);setPage("groups");
+    // Demander permission notifications push
+    setTimeout(()=>requestNotifPermission(name), 2000);
   };
 
   const handleAdmin=()=>{setIsAdmin(true);setPseudo("__admin");setPage("admin");};
