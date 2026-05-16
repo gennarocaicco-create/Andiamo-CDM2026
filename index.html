@@ -988,9 +988,8 @@ function NotifAdmin({players,results,leaderboard,prevLeaderboard}){
 
 function ScorerInput({settings,saveSettings}){
   const[saved,setSaved]=useState(false);
-  const inputRef=useRef(null);
   const save=()=>{
-    const val=inputRef.current?.value||"";
+    const val=document.getElementById("scorer-field")?.value||"";
     saveSettings({bonusResults:{...settings.bonusResults,s:val}});
     setSaved(true);setTimeout(()=>setSaved(false),2000);
   };
@@ -1001,10 +1000,10 @@ function ScorerInput({settings,saveSettings}){
         <span style={{background:T.card2,color:T.gold,borderRadius:20,padding:"2px 12px",fontSize:13,fontWeight:700}}>+6 pts</span>
       </div>
       <input
-        ref={inputRef}
+        id="scorer-field"
         defaultValue={settings.bonusResults?.s||""}
         onKeyDown={e=>e.key==="Enter"&&save()}
-        placeholder="Nom du joueur"
+        placeholder="Nom du joueur — tapez puis cliquez Enregistrer"
         style={{width:"100%",background:"#111b2d",border:`1px solid ${T.border}`,borderRadius:8,padding:"10px 12px",color:"#fff",fontFamily:"Inter,sans-serif",fontSize:14,outline:"none",marginBottom:10}}
       />
       <button onClick={save} style={{background:T.green,color:"#fff",border:"none",borderRadius:8,padding:"9px 20px",fontFamily:"Inter,sans-serif",fontWeight:600,fontSize:14,cursor:"pointer"}}>{saved?"✓ Enregistré":"Enregistrer"}</button>
