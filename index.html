@@ -1063,11 +1063,10 @@ const PLAYERS_BY_TEAM={
 
 function ScorerInput({settings,saveSettings}){
   const br=settings.bonusResults||{};
-  const[player,setPlayer]=useState(br.s||"");
+  const[val,setVal]=useState(br.s||"");
   const[saved,setSaved]=useState(false);
   const save=()=>{
-    if(!player)return;
-    saveSettings({bonusResults:{...br,s:player}});
+    saveSettings({bonusResults:{...br,s:val}});
     setSaved(true);setTimeout(()=>setSaved(false),2000);
   };
   return(
@@ -1076,16 +1075,14 @@ function ScorerInput({settings,saveSettings}){
         <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:20,fontWeight:700,color:T.gold}}>⚽ Meilleur buteur officiel</div>
         <span style={{background:T.card2,color:T.gold,borderRadius:20,padding:"2px 12px",fontSize:13,fontWeight:700}}>+6 pts</span>
       </div>
-      <select value={player} onChange={e=>setPlayer(e.target.value)}
-        style={{width:"100%",background:"#111b2d",border:`1px solid ${T.border}`,borderRadius:8,padding:"10px 12px",color:player?"#fff":T.muted,fontFamily:"Inter,sans-serif",fontSize:14,outline:"none",marginBottom:10}}>
-        <option value="">— Choisir un joueur —</option>
-        {Object.entries(PLAYERS_BY_TEAM).sort(([a],[b])=>a.localeCompare(b,'fr')).map(([country,players])=>(
-          <optgroup key={country} label={`${F[country]||"🏳"} ${country}`}>
-            {players.map(p=><option key={p} value={p}>{F[country]||"🏳"} {p}</option>)}
-          </optgroup>
-        ))}
-      </select>
-      <button onClick={save} disabled={!player} style={{background:player?T.green:"#1a2030",color:player?"#fff":T.muted,border:"none",borderRadius:8,padding:"9px 20px",fontFamily:"Inter,sans-serif",fontWeight:600,fontSize:14,cursor:player?"pointer":"not-allowed"}}>{saved?"✓ Enregistré":"Enregistrer"}</button>
+      <input
+        value={val}
+        onChange={e=>setVal(e.target.value)}
+        onKeyDown={e=>e.key==="Enter"&&save()}
+        placeholder="Nom du joueur"
+        style={{width:"100%",background:"#111b2d",border:`1px solid ${T.border}`,borderRadius:8,padding:"10px 12px",color:"#fff",fontFamily:"Inter,sans-serif",fontSize:14,outline:"none",marginBottom:10}}
+      />
+      <button onClick={save} style={{background:T.green,color:"#fff",border:"none",borderRadius:8,padding:"9px 20px",fontFamily:"Inter,sans-serif",fontWeight:600,fontSize:14,cursor:"pointer"}}>{saved?"✓ Enregistré":"Enregistrer"}</button>
       {br.s&&<span style={{marginLeft:10,fontSize:13,color:T.muted}}>Actuel : <strong style={{color:T.text}}>{br.s}</strong></span>}
     </div>
   );
