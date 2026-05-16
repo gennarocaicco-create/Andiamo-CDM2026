@@ -987,17 +987,12 @@ function NotifAdmin({players,results,leaderboard,prevLeaderboard}){
 
 
 function ScorerInput({settings,saveSettings}){
-  const[s,setS]=useState(settings.bonusResults?.s||"");
   const[saved,setSaved]=useState(false);
   const inputRef=useRef(null);
   const save=()=>{
-    saveSettings({bonusResults:{...settings.bonusResults,s}});
+    const val=inputRef.current?.value||"";
+    saveSettings({bonusResults:{...settings.bonusResults,s:val}});
     setSaved(true);setTimeout(()=>setSaved(false),2000);
-  };
-  const handleChange=e=>{
-    setS(e.target.value);
-    // Garder le focus après le rendu
-    setTimeout(()=>inputRef.current?.focus(),0);
   };
   return(
     <div style={{background:T.card,borderRadius:14,padding:20,border:`1px solid ${T.border}`}}>
@@ -1007,8 +1002,7 @@ function ScorerInput({settings,saveSettings}){
       </div>
       <input
         ref={inputRef}
-        value={s}
-        onChange={handleChange}
+        defaultValue={settings.bonusResults?.s||""}
         onKeyDown={e=>e.key==="Enter"&&save()}
         placeholder="Nom du joueur"
         style={{width:"100%",background:"#111b2d",border:`1px solid ${T.border}`,borderRadius:8,padding:"10px 12px",color:"#fff",fontFamily:"Inter,sans-serif",fontSize:14,outline:"none",marginBottom:10}}
