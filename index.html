@@ -816,32 +816,42 @@ function BonusAdmin({settings,saveSettings}){
   const[f,setF]=useState(br.f||"");
   const[t,setT]=useState(br.t||"");
   const[s,setS]=useState(br.s||"");
-  const FIELDS=[
-    {key:"w",icon:"🏆",label:"Vainqueur officiel",pts:10,type:"select",val:w,set:setW},
-    {key:"f",icon:"🥈",label:"Finaliste officiel",pts:8,type:"select",val:f,set:setF},
-    {key:"t",icon:"🥉",label:"3ème place officielle",pts:4,type:"select",val:t,set:setT},
-    {key:"s",icon:"⚽",label:"Meilleur buteur officiel",pts:6,type:"text",val:s,set:setS},
-  ];
+  const[saved,setSaved]=useState({});
+  const save=(key,val)=>{
+    saveSettings({bonusResults:{...settings.bonusResults,[key]:val}});
+    setSaved(p=>({...p,[key]:true}));
+    setTimeout(()=>setSaved(p=>{const n={...p};delete n[key];return n;}),2000);
+  };
   return(
     <div style={{display:"flex",flexDirection:"column",gap:14}}>
-      {FIELDS.map(({key,icon,label,pts,type,val,set})=>(
+      {[
+        {key:"w",icon:"🏆",label:"Vainqueur officiel",pts:10,type:"select",val:w,set:setW},
+        {key:"f",icon:"🥈",label:"Finaliste officiel",pts:8,type:"select",val:f,set:setF},
+        {key:"t",icon:"🥉",label:"3ème place officielle",pts:4,type:"select",val:t,set:setT},
+      ].map(({key,icon,label,pts,val,set})=>(
         <div key={key} style={{background:T.card,borderRadius:14,padding:20,border:`1px solid ${T.border}`}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
             <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:20,fontWeight:700,color:T.gold}}>{icon} {label}</div>
             <span style={{background:T.card2,color:T.gold,borderRadius:20,padding:"2px 12px",fontSize:13,fontWeight:700}}>+{pts} pts</span>
           </div>
-          {type==="select"?(
-            <select value={val} onChange={e=>set(e.target.value)} style={{width:"100%",background:"#111b2d",border:`1px solid ${T.border}`,borderRadius:8,padding:"10px 12px",color:val?"#fff":T.muted,fontFamily:"Inter,sans-serif",fontSize:14,outline:"none",marginBottom:10}}>
-              <option value="">-- Sélectionner --</option>
-              {ALL_TEAMS.map(t=><option key={t} value={t}>{F[t]||"🏳"} {t}</option>)}
-            </select>
-          ):(
-            <input value={val} onChange={e=>set(e.target.value)} placeholder="Nom du joueur" style={{width:"100%",background:"#111b2d",border:`1px solid ${T.border}`,borderRadius:8,padding:"10px 12px",color:"#fff",fontFamily:"Inter,sans-serif",fontSize:14,outline:"none",marginBottom:10}}/>
-          )}
-          <button onClick={()=>saveSettings({bonusResults:{...settings.bonusResults,[key]:val}})} style={{background:T.green,color:"#fff",border:"none",borderRadius:8,padding:"9px 20px",fontFamily:"Inter,sans-serif",fontWeight:600,fontSize:14,cursor:"pointer"}}>Enregistrer</button>
+          <select value={val} onChange={e=>set(e.target.value)} style={{width:"100%",background:"#111b2d",border:`1px solid ${T.border}`,borderRadius:8,padding:"10px 12px",color:val?"#fff":T.muted,fontFamily:"Inter,sans-serif",fontSize:14,outline:"none",marginBottom:10}}>
+            <option value="">-- Sélectionner --</option>
+            {ALL_TEAMS.map(t=><option key={t} value={t}>{F[t]||"🏳"} {t}</option>)}
+          </select>
+          <button onClick={()=>save(key,val)} style={{background:saved[key]?T.green:T.green,color:"#fff",border:"none",borderRadius:8,padding:"9px 20px",fontFamily:"Inter,sans-serif",fontWeight:600,fontSize:14,cursor:"pointer"}}>{saved[key]?"✓ Enregistré":"Enregistrer"}</button>
           {settings.bonusResults?.[key]&&<span style={{marginLeft:10,fontSize:13,color:T.muted}}>Actuel : <strong style={{color:T.text}}>{F[settings.bonusResults[key]]||""} {settings.bonusResults[key]}</strong></span>}
         </div>
       ))}
+      {/* Meilleur buteur séparé pour éviter le bug de focus */}
+      <div style={{background:T.card,borderRadius:14,padding:20,border:`1px solid ${T.border}`}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:20,fontWeight:700,color:T.gold}}>⚽ Meilleur buteur officiel</div>
+          <span style={{background:T.card2,color:T.gold,borderRadius:20,padding:"2px 12px",fontSize:13,fontWeight:700}}>+6 pts</span>
+        </div>
+        <input value={s} onChange={e=>setS(e.target.value)} placeholder="Nom du joueur" style={{width:"100%",background:"#111b2d",border:`1px solid ${T.border}`,borderRadius:8,padding:"10px 12px",color:"#fff",fontFamily:"Inter,sans-serif",fontSize:14,outline:"none",marginBottom:10}}/>
+        <button onClick={()=>save("s",s)} style={{background:T.green,color:"#fff",border:"none",borderRadius:8,padding:"9px 20px",fontFamily:"Inter,sans-serif",fontWeight:600,fontSize:14,cursor:"pointer"}}>{saved.s?"✓ Enregistré":"Enregistrer"}</button>
+        {settings.bonusResults?.s&&<span style={{marginLeft:10,fontSize:13,color:T.muted}}>Actuel : <strong style={{color:T.text}}>{settings.bonusResults.s}</strong></span>}
+      </div>
     </div>
   );
 }
@@ -1001,6 +1011,36 @@ function NotifAdmin({players,results,leaderboard,prevLeaderboard}){
   );
 }
 
+
+function DeleteParticipantAdmin({players,onDelete}){
+  const[selected,setSelected]=useState("");
+  const[confirm,setConfirm]=useState(false);
+  const[msg,setMsg]=useState("");
+  const handleDelete=async()=>{
+    if(!selected)return;
+    if(!confirm){setConfirm(true);return;}
+    await onDelete(selected);
+    setMsg(`✓ ${selected} supprimé !`);
+    setSelected("");setConfirm(false);
+    setTimeout(()=>setMsg(""),3000);
+  };
+  if(Object.keys(players).length===0) return <p style={{color:T.muted,fontSize:13,margin:0}}>Aucun participant.</p>;
+  return(
+    <div>
+      <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:8}}>
+        <select value={selected} onChange={e=>{setSelected(e.target.value);setConfirm(false);}} style={{flex:1,minWidth:150,background:"#111b2d",border:`1px solid ${T.border}`,borderRadius:8,padding:"9px 12px",color:selected?"#fff":T.muted,fontFamily:"Inter,sans-serif",fontSize:14,outline:"none"}}>
+          <option value="">— Choisir un participant —</option>
+          {Object.keys(players).map(p=><option key={p} value={p}>{p}</option>)}
+        </select>
+        <button onClick={handleDelete} disabled={!selected} style={{background:confirm?T.red:"#3a1010",color:confirm?"#fff":T.red,border:`1px solid ${T.red}66`,borderRadius:8,padding:"9px 16px",fontFamily:"Inter,sans-serif",fontWeight:600,fontSize:14,cursor:selected?"pointer":"not-allowed",flexShrink:0}}>
+          {confirm?"⚠️ Confirmer":"🗑️ Supprimer"}
+        </button>
+      </div>
+      {confirm&&<div style={{fontSize:12,color:T.red,marginBottom:6}}>⚠️ Cela supprimera aussi tous les pronostics de {selected}. Cliquez à nouveau pour confirmer.</div>}
+      {msg&&<div style={{fontSize:13,fontWeight:500,color:T.green}}>{msg}</div>}
+    </div>
+  );
+}
 
 function ResetPasswordAdmin({players}){
   const[selected,setSelected]=useState("");
@@ -1251,8 +1291,18 @@ Si aucun match n'est terminé, réponds : {"results":[]}`;
           </div>
           <div style={{background:T.card,borderRadius:16,padding:20,border:`1px solid ${T.border}`}}>
             <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:20,fontWeight:700,color:T.gold,marginBottom:8}}>Participants ({Object.keys(players).length})</div>
-            <p style={{color:T.muted,fontSize:12,margin:"0 0 12px",lineHeight:1.6}}>Chaque participant crée lui-même son compte. En cas d'oubli de mot de passe, réinitialisez-le ici.</p>
+            <p style={{color:T.muted,fontSize:12,margin:"0 0 12px",lineHeight:1.6}}>Chaque participant crée lui-même son compte. Réinitialisez ou supprimez un participant ici.</p>
             <ResetPasswordAdmin players={players}/>
+            <div style={{marginTop:16,borderTop:`1px solid ${T.border}`,paddingTop:14}}>
+              <div style={{fontSize:13,fontWeight:600,color:T.red,marginBottom:10}}>🗑️ Supprimer un participant</div>
+              <DeleteParticipantAdmin players={players} onDelete={async(name)=>{
+                const np={...players};delete np[name];
+                setPlayers(np);
+                await ss("players",np);
+                await DB.ref(`wc26/predictions/${name}`).remove();
+                await DB.ref(`wc26/passwords/${name}`).remove();
+              }}/>
+            </div>
           </div>
           <div style={{background:T.card,borderRadius:16,padding:20,border:`1px solid ${T.border}`}}>
             <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:20,fontWeight:700,color:T.gold,marginBottom:10}}>Mot de passe admin</div>
