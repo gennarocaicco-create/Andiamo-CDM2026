@@ -525,6 +525,21 @@ function ScorerPlayerPicker({value,onChange}){
   );
 }
 
+const BonusCard=({icon,title,sub,pts,correct,revealed,children})=>(
+  <div style={{background:T.card,borderRadius:16,padding:24,border:`1px solid ${correct?T.green+"66":T.border}`}}>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:14}}>
+      <div>
+        <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:22,fontWeight:700,color:T.gold}}>{icon} {title}</div>
+        <div style={{color:T.muted,fontSize:13,marginTop:3}}>{sub}</div>
+      </div>
+      {correct&&<span style={{background:"#0e2b1a",color:T.green,borderRadius:20,padding:"4px 14px",fontSize:13,fontWeight:700,flexShrink:0}}>✓ +{pts} pts</span>}
+      {!correct&&revealed&&<span style={{background:"#1a0e0e",color:T.red,borderRadius:20,padding:"4px 14px",fontSize:13,fontWeight:700,flexShrink:0}}>✗ 0 pt</span>}
+      {!correct&&!revealed&&<span style={{background:T.card2,color:T.muted,borderRadius:20,padding:"4px 14px",fontSize:13,fontWeight:700,flexShrink:0}}>{pts} pts</span>}
+    </div>
+    {children}
+  </div>
+);
+
 function BonusPage({preds,settings,onChangeBonus}){
   const br=settings.bonusResults||{};
   const[localW,setLocalW]=useState(preds.bonus?.w||"");
@@ -537,52 +552,38 @@ function BonusPage({preds,settings,onChangeBonus}){
   const finOk=br.f&&localF===br.f;
   const thrOk=br.t&&localT===br.t;
   const scrOk=br.s&&preds.bonus?.s===br.s;
-  const Card=({icon,title,sub,pts,correct,revealed,children})=>(
-    <div style={{background:T.card,borderRadius:16,padding:24,border:`1px solid ${correct?T.green+"66":T.border}`}}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:14}}>
-        <div>
-          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:22,fontWeight:700,color:T.gold}}>{icon} {title}</div>
-          <div style={{color:T.muted,fontSize:13,marginTop:3}}>{sub}</div>
-        </div>
-        {correct&&<span style={{background:"#0e2b1a",color:T.green,borderRadius:20,padding:"4px 14px",fontSize:13,fontWeight:700,flexShrink:0}}>✓ +{pts} pts</span>}
-        {!correct&&revealed&&<span style={{background:"#1a0e0e",color:T.red,borderRadius:20,padding:"4px 14px",fontSize:13,fontWeight:700,flexShrink:0}}>✗ 0 pt</span>}
-        {!correct&&!revealed&&<span style={{background:T.card2,color:T.muted,borderRadius:20,padding:"4px 14px",fontSize:13,fontWeight:700,flexShrink:0}}>{pts} pts</span>}
-      </div>
-      {children}
-    </div>
-  );
   return(
     <div style={{paddingTop:20}}>
       <PageTitle sub="Pronostics bonus — à saisir avant le début du tournoi !">PRONOSTICS BONUS</PageTitle>
       <div style={{display:"flex",flexDirection:"column",gap:16}}>
-        <Card icon="🏆" title="Vainqueur du Mondial" sub="Quel pays va soulever la Coupe ?" pts={10} correct={winOk} revealed={!!br.w}>
+        <BonusCard icon="🏆" title="Vainqueur du Mondial" sub="Quel pays va soulever la Coupe ?" pts={10} correct={winOk} revealed={!!br.w}>
           <select value={localW} onChange={e=>{setLocalW(e.target.value);onChangeBonus("w",e.target.value);}} style={{width:"100%",background:"#111b2d",border:`1px solid ${T.border}`,borderRadius:10,padding:"12px 14px",color:localW?"#fff":T.muted,fontFamily:"Inter,sans-serif",fontSize:15,outline:"none",cursor:"pointer"}}>
             <option value="">— Choisir un pays —</option>
             {ALL_TEAMS.map(t=><option key={t} value={t}>{F[t]||"🏳"} {t}</option>)}
           </select>
           {localW&&<div style={{marginTop:6,fontSize:24,textAlign:"center"}}>{F[localW]||"🏳"} <span style={{fontSize:14,color:T.text,fontWeight:600,verticalAlign:"middle"}}>{localW}</span></div>}
           {br.w&&<div style={{marginTop:8,padding:"8px 12px",background:T.card2,borderRadius:8,fontSize:13}}>Résultat officiel : <strong style={{color:T.text}}>{F[br.w]||"🏳"} {br.w}</strong></div>}
-        </Card>
-        <Card icon="🥈" title="Finaliste" sub="Quel pays sera en finale mais perdra ?" pts={8} correct={finOk} revealed={!!br.f}>
+        </BonusCard>
+        <BonusCard icon="🥈" title="Finaliste" sub="Quel pays sera en finale mais perdra ?" pts={8} correct={finOk} revealed={!!br.f}>
           <select value={localF} onChange={e=>{setLocalF(e.target.value);onChangeBonus("f",e.target.value);}} style={{width:"100%",background:"#111b2d",border:`1px solid ${T.border}`,borderRadius:10,padding:"12px 14px",color:localF?"#fff":T.muted,fontFamily:"Inter,sans-serif",fontSize:15,outline:"none",cursor:"pointer"}}>
             <option value="">— Choisir un pays —</option>
             {ALL_TEAMS.map(t=><option key={t} value={t}>{F[t]||"🏳"} {t}</option>)}
           </select>
           {localF&&<div style={{marginTop:6,fontSize:24,textAlign:"center"}}>{F[localF]||"🏳"} <span style={{fontSize:14,color:T.text,fontWeight:600,verticalAlign:"middle"}}>{localF}</span></div>}
           {br.f&&<div style={{marginTop:8,padding:"8px 12px",background:T.card2,borderRadius:8,fontSize:13}}>Résultat officiel : <strong style={{color:T.text}}>{F[br.f]||"🏳"} {br.f}</strong></div>}
-        </Card>
-        <Card icon="🥉" title="Troisième place" sub="Quel pays remportera le match pour la 3ème place ?" pts={4} correct={thrOk} revealed={!!br.t}>
+        </BonusCard>
+        <BonusCard icon="🥉" title="Troisième place" sub="Quel pays remportera le match pour la 3ème place ?" pts={4} correct={thrOk} revealed={!!br.t}>
           <select value={localT} onChange={e=>{setLocalT(e.target.value);onChangeBonus("t",e.target.value);}} style={{width:"100%",background:"#111b2d",border:`1px solid ${T.border}`,borderRadius:10,padding:"12px 14px",color:localT?"#fff":T.muted,fontFamily:"Inter,sans-serif",fontSize:15,outline:"none",cursor:"pointer"}}>
             <option value="">— Choisir un pays —</option>
             {ALL_TEAMS.map(t=><option key={t} value={t}>{F[t]||"🏳"} {t}</option>)}
           </select>
           {localT&&<div style={{marginTop:6,fontSize:24,textAlign:"center"}}>{F[localT]||"🏳"} <span style={{fontSize:14,color:T.text,fontWeight:600,verticalAlign:"middle"}}>{localT}</span></div>}
           {br.t&&<div style={{marginTop:8,padding:"8px 12px",background:T.card2,borderRadius:8,fontSize:13}}>Résultat officiel : <strong style={{color:T.text}}>{F[br.t]||"🏳"} {br.t}</strong></div>}
-        </Card>
-        <Card icon="⚽" title="Meilleur buteur" sub="Quel joueur va marquer le plus de buts ?" pts={6} correct={scrOk} revealed={!!br.s}>
+        </BonusCard>
+        <BonusCard icon="⚽" title="Meilleur buteur" sub="Quel joueur va marquer le plus de buts ?" pts={6} correct={scrOk} revealed={!!br.s}>
           <ScorerPlayerPicker value={preds.bonus?.s||""} onChange={v=>onChangeBonus("s",v)}/>
           {br.s&&<div style={{marginTop:10,padding:"8px 12px",background:T.card2,borderRadius:8,fontSize:13}}>Résultat officiel : <strong style={{color:T.text}}>{br.s}</strong></div>}
-        </Card>
+        </BonusCard>
       </div>
     </div>
   );
@@ -1075,13 +1076,7 @@ function ScorerInput({settings,saveSettings}){
         <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:20,fontWeight:700,color:T.gold}}>⚽ Meilleur buteur officiel</div>
         <span style={{background:T.card2,color:T.gold,borderRadius:20,padding:"2px 12px",fontSize:13,fontWeight:700}}>+6 pts</span>
       </div>
-      <input
-        value={val}
-        onChange={e=>setVal(e.target.value)}
-        onKeyDown={e=>e.key==="Enter"&&save()}
-        placeholder="Nom du joueur"
-        style={{width:"100%",background:"#111b2d",border:`1px solid ${T.border}`,borderRadius:8,padding:"10px 12px",color:"#fff",fontFamily:"Inter,sans-serif",fontSize:14,outline:"none",marginBottom:10}}
-      />
+      <input value={val} onChange={e=>setVal(e.target.value)} onKeyDown={e=>e.key==="Enter"&&save()} placeholder="Nom du joueur" style={{width:"100%",background:"#111b2d",border:`1px solid ${T.border}`,borderRadius:8,padding:"10px 12px",color:"#fff",fontFamily:"Inter,sans-serif",fontSize:14,outline:"none",marginBottom:10}}/>
       <button onClick={save} style={{background:T.green,color:"#fff",border:"none",borderRadius:8,padding:"9px 20px",fontFamily:"Inter,sans-serif",fontWeight:600,fontSize:14,cursor:"pointer"}}>{saved?"✓ Enregistré":"Enregistrer"}</button>
       {br.s&&<span style={{marginLeft:10,fontSize:13,color:T.muted}}>Actuel : <strong style={{color:T.text}}>{br.s}</strong></span>}
     </div>
