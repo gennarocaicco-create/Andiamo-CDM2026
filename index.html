@@ -825,7 +825,7 @@ function BonusAdmin({settings,saveSettings}){
         </div>
       ))}
       {/* Meilleur buteur — composant isolé pour éviter le bug de focus */}
-      <ScorerInput settings={settings} saveSettings={saveSettings}/>
+      <ScorerInput key="scorer-input-stable" settings={settings} saveSettings={saveSettings}/>
     </div>
   );
 }
@@ -1268,7 +1268,7 @@ Si aucun match n'est terminé, réponds : {"results":[]}`;
       )}
 
       {adminTab==="bonus"&&(
-        <BonusAdmin settings={settings} saveSettings={saveSettings}/>
+        <BonusAdmin key="bonus-admin-stable" settings={settings} saveSettings={saveSettings}/>
       )}
 
       {adminTab==="classement"&&(
@@ -1436,7 +1436,8 @@ function App(){
   const saveSettings=async(upd)=>{
     const ns={...settings,...upd};
     if(upd.bonusResults)ns.bonusResults={...settings.bonusResults,...upd.bonusResults};
-    setSettings(ns);await ss("settings",ns);
+    await ss("settings",ns);
+    setSettings(ns);
   };
   const addKoMatch=async(round,h,a)=>{
     const prev=koMatches[round]||[];
