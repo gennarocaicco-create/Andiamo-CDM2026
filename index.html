@@ -1029,6 +1029,7 @@ function ScorerInput({settings,saveSettings}){
     </div>
   );
 }
+function DeleteParticipantAdmin({players,onDelete}){
   const[selected,setSelected]=useState("");
   const[confirm,setConfirm]=useState(false);
   const[msg,setMsg]=useState("");
