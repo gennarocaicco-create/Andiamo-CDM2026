@@ -44,7 +44,7 @@
   async function registerSW() {
     if (!('serviceWorker' in navigator)) return;
     try {
-      const reg = await navigator.serviceWorker.register('firebase-messaging-sw.js');
+      const reg = await navigator.serviceWorker.register('/Andiamo-CDM2026/firebase-messaging-sw.js');
       MESSAGING.useServiceWorker(reg);
     } catch(e) { console.log('SW:', e); }
   }
