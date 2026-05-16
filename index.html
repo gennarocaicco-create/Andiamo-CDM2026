@@ -1003,7 +1003,7 @@ function ScorerInput({settings,saveSettings}){
         <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:20,fontWeight:700,color:T.gold}}>⚽ Meilleur buteur officiel</div>
         <span style={{background:T.card2,color:T.gold,borderRadius:20,padding:"2px 12px",fontSize:13,fontWeight:700}}>+6 pts</span>
       </div>
-      <input id="scorer-field" type="text" placeholder="Nom du joueur" style={{width:"100%",background:"#111b2d",border:`1px solid ${T.border}`,borderRadius:8,padding:"10px 12px",color:"#fff",fontFamily:"Inter,sans-serif",fontSize:14,outline:"none",marginBottom:10}}/>
+      <input id="scorer-field" type="text" placeholder="Nom du joueur" autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false" style={{width:"100%",background:"#111b2d",border:`1px solid ${T.border}`,borderRadius:8,padding:"10px 12px",color:"#fff",fontFamily:"Inter,sans-serif",fontSize:14,outline:"none",marginBottom:10}}/>
       <button id="scorer-btn" onClick={save} style={{background:T.green,color:"#fff",border:"none",borderRadius:8,padding:"9px 20px",fontFamily:"Inter,sans-serif",fontWeight:600,fontSize:14,cursor:"pointer"}}>Enregistrer</button>
       {settings.bonusResults?.s&&<span style={{marginLeft:10,fontSize:13,color:T.muted}}>Actuel : <strong style={{color:T.text}}>{settings.bonusResults.s}</strong></span>}
     </div>
