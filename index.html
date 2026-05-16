@@ -842,16 +842,8 @@ function BonusAdmin({settings,saveSettings}){
           {settings.bonusResults?.[key]&&<span style={{marginLeft:10,fontSize:13,color:T.muted}}>Actuel : <strong style={{color:T.text}}>{F[settings.bonusResults[key]]||""} {settings.bonusResults[key]}</strong></span>}
         </div>
       ))}
-      {/* Meilleur buteur séparé pour éviter le bug de focus */}
-      <div style={{background:T.card,borderRadius:14,padding:20,border:`1px solid ${T.border}`}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:20,fontWeight:700,color:T.gold}}>⚽ Meilleur buteur officiel</div>
-          <span style={{background:T.card2,color:T.gold,borderRadius:20,padding:"2px 12px",fontSize:13,fontWeight:700}}>+6 pts</span>
-        </div>
-        <input value={s} onChange={e=>setS(e.target.value)} placeholder="Nom du joueur" style={{width:"100%",background:"#111b2d",border:`1px solid ${T.border}`,borderRadius:8,padding:"10px 12px",color:"#fff",fontFamily:"Inter,sans-serif",fontSize:14,outline:"none",marginBottom:10}}/>
-        <button onClick={()=>save("s",s)} style={{background:T.green,color:"#fff",border:"none",borderRadius:8,padding:"9px 20px",fontFamily:"Inter,sans-serif",fontWeight:600,fontSize:14,cursor:"pointer"}}>{saved.s?"✓ Enregistré":"Enregistrer"}</button>
-        {settings.bonusResults?.s&&<span style={{marginLeft:10,fontSize:13,color:T.muted}}>Actuel : <strong style={{color:T.text}}>{settings.bonusResults.s}</strong></span>}
-      </div>
+      {/* Meilleur buteur — composant isolé pour éviter le bug de focus */}
+      <ScorerInput settings={settings} saveSettings={saveSettings}/>
     </div>
   );
 }
@@ -1012,7 +1004,31 @@ function NotifAdmin({players,results,leaderboard,prevLeaderboard}){
 }
 
 
-function DeleteParticipantAdmin({players,onDelete}){
+function ScorerInput({settings,saveSettings}){
+  const[s,setS]=useState(settings.bonusResults?.s||"");
+  const[saved,setSaved]=useState(false);
+  const save=()=>{
+    saveSettings({bonusResults:{...settings.bonusResults,s}});
+    setSaved(true);setTimeout(()=>setSaved(false),2000);
+  };
+  return(
+    <div style={{background:T.card,borderRadius:14,padding:20,border:`1px solid ${T.border}`}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+        <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:20,fontWeight:700,color:T.gold}}>⚽ Meilleur buteur officiel</div>
+        <span style={{background:T.card2,color:T.gold,borderRadius:20,padding:"2px 12px",fontSize:13,fontWeight:700}}>+6 pts</span>
+      </div>
+      <input
+        value={s}
+        onChange={e=>setS(e.target.value)}
+        onKeyDown={e=>e.key==="Enter"&&save()}
+        placeholder="Nom du joueur"
+        style={{width:"100%",background:"#111b2d",border:`1px solid ${T.border}`,borderRadius:8,padding:"10px 12px",color:"#fff",fontFamily:"Inter,sans-serif",fontSize:14,outline:"none",marginBottom:10}}
+      />
+      <button onClick={save} style={{background:T.green,color:"#fff",border:"none",borderRadius:8,padding:"9px 20px",fontFamily:"Inter,sans-serif",fontWeight:600,fontSize:14,cursor:"pointer"}}>{saved?"✓ Enregistré":"Enregistrer"}</button>
+      {settings.bonusResults?.s&&<span style={{marginLeft:10,fontSize:13,color:T.muted}}>Actuel : <strong style={{color:T.text}}>{settings.bonusResults.s}</strong></span>}
+    </div>
+  );
+}
   const[selected,setSelected]=useState("");
   const[confirm,setConfirm]=useState(false);
   const[msg,setMsg]=useState("");
