@@ -124,10 +124,11 @@ async function fetchLiveMatches() {
 }
 
 // Hook : scores live rafraîchis toutes les 30s
-function useLiveScores() {
+function useLiveScores(isAdmin=false) {
   const [liveData, setLiveData] = useState([]);
   const [lastUpdate, setLastUpdate] = useState(null);
   useEffect(() => {
+    if(isAdmin) return; // Pas de polling en mode admin
     const run = async () => {
       const data = await fetchLiveMatches();
       if (data.length > 0) { setLiveData(data); setLastUpdate(new Date()); }
@@ -135,7 +136,7 @@ function useLiveScores() {
     run();
     const interval = setInterval(run, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [isAdmin]);
   return { liveData, lastUpdate };
 }
 
@@ -1335,7 +1336,7 @@ function App(){
   const[lbLoading,setLbLoading]=useState(false);
   const[schedule,setSchedule]=useState({});
   const[scheduleLoading,setScheduleLoading]=useState(true);
-  const { liveData, lastUpdate } = useLiveScores();
+  const { liveData, lastUpdate } = useLiveScores(isAdmin);
 
   const saveTimer=useRef(null);
   const predsRef=useRef(preds); predsRef.current=preds;
