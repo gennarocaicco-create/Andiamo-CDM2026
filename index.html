@@ -511,6 +511,32 @@ function GroupsPage({preds,results,activeGroup,setActiveGroup,onChangePred,sched
   );
 }
 
+function ScorerPlayerPicker({value,onChange}){
+  const[country,setCountry]=useState(()=>{
+    if(!value)return"";
+    for(const[c,players] of Object.entries(PLAYERS_BY_TEAM)){
+      if(players.includes(value))return c;
+    }
+    return"";
+  });
+  const players=country?PLAYERS_BY_TEAM[country]||[]:[];
+  return(
+    <div style={{display:"flex",flexDirection:"column",gap:8}}>
+      <select value={country} onChange={e=>{setCountry(e.target.value);onChange("");}} style={{width:"100%",background:"#111b2d",border:`1px solid ${T.border}`,borderRadius:10,padding:"12px 14px",color:country?"#fff":T.muted,fontFamily:"Inter,sans-serif",fontSize:15,outline:"none",cursor:"pointer"}}>
+        <option value="">— Choisir le pays —</option>
+        {Object.keys(PLAYERS_BY_TEAM).map(c=><option key={c} value={c}>{F[c]||"🏳"} {c}</option>)}
+      </select>
+      {country&&(
+        <select value={value} onChange={e=>onChange(e.target.value)} style={{width:"100%",background:"#111b2d",border:`1px solid ${T.border}`,borderRadius:10,padding:"12px 14px",color:value?"#fff":T.muted,fontFamily:"Inter,sans-serif",fontSize:15,outline:"none",cursor:"pointer"}}>
+          <option value="">— Choisir le joueur —</option>
+          {players.map(p=><option key={p} value={p}>{p}</option>)}
+        </select>
+      )}
+      {value&&<div style={{fontSize:13,color:T.green,fontWeight:600}}>✓ {value} sélectionné</div>}
+    </div>
+  );
+}
+
 function BonusPage({preds,settings,onChangeBonus}){
   const br=settings.bonusResults||{};
   const winOk=br.w&&preds.bonus?.w===br.w;
@@ -557,7 +583,7 @@ function BonusPage({preds,settings,onChangeBonus}){
           {br.t&&<div style={{marginTop:10,padding:"8px 12px",background:T.card2,borderRadius:8,fontSize:13}}>Résultat officiel : <strong style={{color:T.text}}>{F[br.t]||"🏳"} {br.t}</strong></div>}
         </Card>
         <Card icon="⚽" title="Meilleur buteur" sub="Quel joueur va marquer le plus de buts ?" pts={6} correct={scrOk} revealed={!!br.s}>
-          <input value={preds.bonus?.s||""} onChange={e=>onChangeBonus("s",e.target.value)} placeholder="Ex : Mbappé, Vinicius, Haaland…" style={{width:"100%",background:"#111b2d",border:`1px solid ${T.border}`,borderRadius:10,padding:"12px 14px",color:"#fff",fontFamily:"Inter,sans-serif",fontSize:15,outline:"none"}}/>
+          <ScorerPlayerPicker value={preds.bonus?.s||""} onChange={v=>onChangeBonus("s",v)}/>
           {br.s&&<div style={{marginTop:10,padding:"8px 12px",background:T.card2,borderRadius:8,fontSize:13}}>Résultat officiel : <strong style={{color:T.text}}>{br.s}</strong></div>}
         </Card>
       </div>
@@ -987,16 +1013,73 @@ function NotifAdmin({players,results,leaderboard,prevLeaderboard}){
 }
 
 
+const PLAYERS_BY_TEAM={
+  "Mexique":["S. Giménez","H. Lozano","R. Jiménez","A. Vega","O. Antuna","J. Macias","U. Antuna","C. Acevedo"],
+  "Afrique du Sud":["P. Tau","E. Dolly","T. Mayele","L. de Reuck","T. Zwane","V. Mothwa","B. Petersen"],
+  "Corée du Sud":["H. Son","S. Hwang","C. Cho","K. Lee","S. Kwon","T. Oh","J. Hwang","B. Kim"],
+  "Rép. Tchèque":["P. Schick","T. Souček","A. Hlozek","M. Kuchta","J. Kuchta","O. Lingr","D. Jurásek"],
+  "Canada":["A. Davies","C. David","J. Larin","S. Eustaquio","T. Buchanan","J. Osorio","D. Adekugbe"],
+  "Bosnie-Herzégovine":["E. Džeko","S. Pjanić","S. Kolasinac","V. Milinković-Savić","A. Hadžić","S. Rahimić"],
+  "Qatar":["A. Afif","M. Munir","A. Hatem","B. Al-Rawi","Y. Al-Hamad","A. Al-Haydos","N. Al-Haydos"],
+  "Suisse":["G. Xhaka","B. Embolo","N. Amdouni","X. Shaqiri","H. Seferovic","S. Okafor","M. Aebischer"],
+  "Brésil":["V. Jr.","R. Firmino","G. Martinelli","Rodrygo","Endrick","Savinho","Lucas Paquetá","Rapinha"],
+  "Maroc":["A. Hakimi","Y. En-Nesyri","H. Ziyech","S. Amrabat","B. Bounou","I. Diaz","A. Ounahi"],
+  "Haïti":["T. Chalobah","S. Sainté","D. Arcus","J. Lauture","G. Angella","J. Pierre","K. Antoine"],
+  "Écosse":["A. Robertson","S. McTominay","L. Ferguson","C. Adams","J. McGinn","K. Tierney","R. Christie"],
+  "États-Unis":["C. Pulisic","G. Reyna","R. Reyna","F. Weah","J. Sargent","B. Aaronson","T. Adams","M. McKennie"],
+  "Paraguay":["M. Almirón","A. Sanabria","R. Enciso","J. Alonso","G. Gómez","A. Alderete","D. Duarte"],
+  "Australie":["M. Leckie","M. Bos","C. Goodwin","A. Mabil","J. Irvine","A. Redmayne","R. McGree"],
+  "Turquie":["B. Yılmaz","H. Çalhanoğlu","A. Yıldız","K. Akturkoglu","C. Tosun","I. Kabak","M. Demiral"],
+  "Allemagne":["F. Wirtz","J. Musiala","K. Havertz","L. Goretzka","T. Müller","L. Füllkrug","S. Gnabry","I. Gündogan"],
+  "Curaçao":["L. Fer","F. Hasselbaink","B. Martina","G. Daal","J. Tévita","D. van der Beek","R. Thomas"],
+  "Côte d'Ivoire":["S. Haller","F. Koné","N. Pépé","M. Sangaré","E. Zaha","F. Gradel","K. Konaté"],
+  "Équateur":["E. Valencia","M. Estupiñán","A. Mena","J. Ibarra","G. Preciado","P. Ibáñez","C. Gruezo"],
+  "Pays-Bas":["V. van Dijk","F. de Jong","C. Gakpo","D. Dumfries","X. Simons","W. Weghorst","D. Blind","T. Reijnders"],
+  "Japon":["D. Mitoma","H. Kubo","R. Doan","Y. Ueda","K. Furuhashi","J. Ito","T. Tomiyasu","W. Endo"],
+  "Suède":["A. Isak","V. Gyökeres","D. Kulusevski","M. Forsberg","R. Quaison","E. Svensson","O. Björkan"],
+  "Tunisie":["Y. Msakni","O. Khazri","N. Sliti","E. Skhiri","A. Badri","M. Ben Amor","A. Haddadi"],
+  "Belgique":["R. Lukaku","K. De Bruyne","J. Doku","L. Trossard","T. Hazard","Y. Carrasco","A. Onana"],
+  "Égypte":["M. Salah","O. Marmoush","M. Elneny","T. Mohamed","A. Hegazi","M. Abu Gabal","K. El Ahmadi"],
+  "Iran":["M. Taremi","S. Azmoun","K. Ansarifard","R. Rezaeian","A. Jahanbakhsh","M. Beiranvand","M. Shojaei"],
+  "Nouvelle-Zélande":["C. Wood","M. Fisher","T. Goliat","O. Sail","K. Stevens","J. Sutton","M. Just"],
+  "Espagne":["A. Morata","F. Torres","L. Yamal","N. Williams","P. Gavi","P. Pedri","D. Olmo","R. Merino"],
+  "Cap-Vert":["G. Tavares","D. Andrade","R. Andrade","C. Tavares","J. Lopes","M. Andrade","L. Lima"],
+  "Arabie saoudite":["S. Al-Dawsari","F. Al-Buraikan","H. Al-Shahrani","M. Al-Owais","A. Al-Amri","S. Al-Ghannam"],
+  "Uruguay":["L. Suárez","D. Núñez","F. Valverde","R. Bentancur","E. Cavani","M. Ugarte","G. De Arrascaeta"],
+  "France":["K. Mbappé","A. Griezmann","O. Giroud","M. Camavinga","A. Tchouaméni","K. Benzema","O. Dembélé","M. Thuram"],
+  "Sénégal":["S. Mané","B. Diallo","I. Sarr","K. Coulibaly","A. Diallo","N. Mendy","P. Gueye","Y. Sabaly"],
+  "Irak":["A. Mohanad","A. Al-Tamimi","A. Al-Hamdani","B. Al-Azzawi","A. Karrar","M. Tariq"],
+  "Norvège":["E. Haaland","M. Ødegaard","A. Sörloth","J. Larsson","V. Thorsby","M. Elyounoussi","O. Ajer"],
+  "Argentine":["L. Messi","J. Álvarez","L. Martínez","R. De Paul","A. Mac Allister","N. González","P. Di María","T. Fernández"],
+  "Algérie":["R. Mahrez","I. Slimani","B. Bounedjah","Y. Atal","A. Bennacer","H. Bensebaini","A. Zerrouki"],
+  "Autriche":["D. Alaba","M. Arnautovic","C. Baumgartner","K. Laimer","M. Gregoritsch","S. Lainer","N. Seiwald"],
+  "Jordanie":["Y. Al-Naimat","M. Al-Tamari","B. Al-Aqrabawi","O. Haddadin","A. Harb","E. Soudani","M. Abu Zema"],
+  "Portugal":["C. Ronaldo","B. Silva","R. Leão","J. Félix","B. Fernandes","V. Horta","D. Jota","G. Ramos"],
+  "RD Congo":["C. Boli","S. Makiese","A. Muanda","Y. Lihadji","P. Bongonda","J. Makengo","G. Kakuta"],
+  "Ouzbékistan":["E. Shomurodov","J. Khamdamov","B. Tursunov","A. Ismoilov","U. Alikhanov","S. Komilov"],
+  "Colombie":["L. Díaz","J. Cuadrado","R. Falcao","D. Valoyes","M. Ríos","Y. Mina","J. Lerma","J. Borré"],
+  "Angleterre":["H. Kane","J. Bellingham","P. Foden","B. Saka","M. Rashford","J. Grealish","O. Watkins","C. Palmer"],
+  "Croatie":["L. Modrić","I. Perišić","B. Pašalić","A. Kramarić","M. Budimir","J. Gvardiol","M. Kovačić"],
+  "Ghana":["J. Ayew","A. Ayew","M. Kudus","T. Partey","B. Mensah","J. Paintsil","D. Asante","A. Schlupp"],
+  "Panama":["R. Córdoba","A. Murillo","A. Gallardo","E. Torres","J. Davis","B. Ureña","C. Perez"],
+};
+
 function ScorerInput({settings,saveSettings}){
-  useEffect(()=>{
-    const field=document.getElementById("scorer-field");
-    if(field&&settings.bonusResults?.s&&!field.value)field.value=settings.bonusResults.s;
-  },[]);
+  const br=settings.bonusResults||{};
+  const[country,setCountry]=useState(()=>{
+    if(!br.s)return"";
+    for(const[c,players] of Object.entries(PLAYERS_BY_TEAM)){
+      if(players.includes(br.s))return c;
+    }
+    return"";
+  });
+  const[player,setPlayer]=useState(br.s||"");
+  const[saved,setSaved]=useState(false);
+  const players=country?PLAYERS_BY_TEAM[country]||[]:[];
   const save=()=>{
-    const val=document.getElementById("scorer-field")?.value||"";
-    saveSettings({bonusResults:{...settings.bonusResults,s:val}});
-    const btn=document.getElementById("scorer-btn");
-    if(btn){btn.textContent="✓ Enregistré";btn.style.background="#16a34a";setTimeout(()=>{btn.textContent="Enregistrer";btn.style.background=T.green;},2000);}
+    if(!player)return;
+    saveSettings({bonusResults:{...br,s:player}});
+    setSaved(true);setTimeout(()=>setSaved(false),2000);
   };
   return(
     <div style={{background:T.card,borderRadius:14,padding:20,border:`1px solid ${T.border}`}}>
@@ -1004,9 +1087,18 @@ function ScorerInput({settings,saveSettings}){
         <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:20,fontWeight:700,color:T.gold}}>⚽ Meilleur buteur officiel</div>
         <span style={{background:T.card2,color:T.gold,borderRadius:20,padding:"2px 12px",fontSize:13,fontWeight:700}}>+6 pts</span>
       </div>
-      <input id="scorer-field" type="text" placeholder="Nom du joueur" autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false" style={{width:"100%",background:"#111b2d",border:`1px solid ${T.border}`,borderRadius:8,padding:"10px 12px",color:"#fff",fontFamily:"Inter,sans-serif",fontSize:14,outline:"none",marginBottom:10}}/>
-      <button id="scorer-btn" onClick={save} style={{background:T.green,color:"#fff",border:"none",borderRadius:8,padding:"9px 20px",fontFamily:"Inter,sans-serif",fontWeight:600,fontSize:14,cursor:"pointer"}}>Enregistrer</button>
-      {settings.bonusResults?.s&&<span style={{marginLeft:10,fontSize:13,color:T.muted}}>Actuel : <strong style={{color:T.text}}>{settings.bonusResults.s}</strong></span>}
+      <select value={country} onChange={e=>{setCountry(e.target.value);setPlayer("");}} style={{width:"100%",background:"#111b2d",border:`1px solid ${T.border}`,borderRadius:8,padding:"10px 12px",color:country?"#fff":T.muted,fontFamily:"Inter,sans-serif",fontSize:14,outline:"none",marginBottom:10}}>
+        <option value="">— Choisir le pays —</option>
+        {Object.keys(PLAYERS_BY_TEAM).map(c=><option key={c} value={c}>{F[c]||"🏳"} {c}</option>)}
+      </select>
+      {country&&(
+        <select value={player} onChange={e=>setPlayer(e.target.value)} style={{width:"100%",background:"#111b2d",border:`1px solid ${T.border}`,borderRadius:8,padding:"10px 12px",color:player?"#fff":T.muted,fontFamily:"Inter,sans-serif",fontSize:14,outline:"none",marginBottom:10}}>
+          <option value="">— Choisir le joueur —</option>
+          {players.map(p=><option key={p} value={p}>{p}</option>)}
+        </select>
+      )}
+      <button onClick={save} disabled={!player} style={{background:player?T.green:"#1a2030",color:player?"#fff":T.muted,border:"none",borderRadius:8,padding:"9px 20px",fontFamily:"Inter,sans-serif",fontWeight:600,fontSize:14,cursor:player?"pointer":"not-allowed"}}>{saved?"✓ Enregistré":"Enregistrer"}</button>
+      {br.s&&<span style={{marginLeft:10,fontSize:13,color:T.muted}}>Actuel : <strong style={{color:T.text}}>{br.s}</strong></span>}
     </div>
   );
 }
