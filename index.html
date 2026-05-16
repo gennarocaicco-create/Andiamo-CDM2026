@@ -554,21 +554,24 @@ function BonusPage({preds,settings,onChangeBonus}){
             <option value="">— Choisir un pays —</option>
             {ALL_TEAMS.map(t=><option key={t} value={t}>{F[t]||"🏳"} {t}</option>)}
           </select>
-          {br.w&&<div style={{marginTop:10,padding:"8px 12px",background:T.card2,borderRadius:8,fontSize:13}}>Résultat officiel : <strong style={{color:T.text}}>{F[br.w]||"🏳"} {br.w}</strong></div>}
+          {preds.bonus?.w&&<div style={{marginTop:6,fontSize:22,textAlign:"center"}}>{F[preds.bonus.w]||"🏳"} <span style={{fontSize:14,color:T.text,fontWeight:600}}>{preds.bonus.w}</span></div>}
+          {br.w&&<div style={{marginTop:8,padding:"8px 12px",background:T.card2,borderRadius:8,fontSize:13}}>Résultat officiel : <strong style={{color:T.text}}>{F[br.w]||"🏳"} {br.w}</strong></div>}
         </Card>
         <Card icon="🥈" title="Finaliste" sub="Quel pays sera en finale mais perdra ?" pts={8} correct={finOk} revealed={!!br.f}>
           <select value={preds.bonus?.f||""} onChange={e=>onChangeBonus("f",e.target.value)} style={{width:"100%",background:"#111b2d",border:`1px solid ${T.border}`,borderRadius:10,padding:"12px 14px",color:preds.bonus?.f?"#fff":T.muted,fontFamily:"Inter,sans-serif",fontSize:15,outline:"none",cursor:"pointer"}}>
             <option value="">— Choisir un pays —</option>
             {ALL_TEAMS.map(t=><option key={t} value={t}>{F[t]||"🏳"} {t}</option>)}
           </select>
-          {br.f&&<div style={{marginTop:10,padding:"8px 12px",background:T.card2,borderRadius:8,fontSize:13}}>Résultat officiel : <strong style={{color:T.text}}>{F[br.f]||"🏳"} {br.f}</strong></div>}
+          {preds.bonus?.f&&<div style={{marginTop:6,fontSize:22,textAlign:"center"}}>{F[preds.bonus.f]||"🏳"} <span style={{fontSize:14,color:T.text,fontWeight:600}}>{preds.bonus.f}</span></div>}
+          {br.f&&<div style={{marginTop:8,padding:"8px 12px",background:T.card2,borderRadius:8,fontSize:13}}>Résultat officiel : <strong style={{color:T.text}}>{F[br.f]||"🏳"} {br.f}</strong></div>}
         </Card>
         <Card icon="🥉" title="Troisième place" sub="Quel pays remportera le match pour la 3ème place ?" pts={4} correct={thrOk} revealed={!!br.t}>
           <select value={preds.bonus?.t||""} onChange={e=>onChangeBonus("t",e.target.value)} style={{width:"100%",background:"#111b2d",border:`1px solid ${T.border}`,borderRadius:10,padding:"12px 14px",color:preds.bonus?.t?"#fff":T.muted,fontFamily:"Inter,sans-serif",fontSize:15,outline:"none",cursor:"pointer"}}>
             <option value="">— Choisir un pays —</option>
             {ALL_TEAMS.map(t=><option key={t} value={t}>{F[t]||"🏳"} {t}</option>)}
           </select>
-          {br.t&&<div style={{marginTop:10,padding:"8px 12px",background:T.card2,borderRadius:8,fontSize:13}}>Résultat officiel : <strong style={{color:T.text}}>{F[br.t]||"🏳"} {br.t}</strong></div>}
+          {preds.bonus?.t&&<div style={{marginTop:6,fontSize:22,textAlign:"center"}}>{F[preds.bonus.t]||"🏳"} <span style={{fontSize:14,color:T.text,fontWeight:600}}>{preds.bonus.t}</span></div>}
+          {br.t&&<div style={{marginTop:8,padding:"8px 12px",background:T.card2,borderRadius:8,fontSize:13}}>Résultat officiel : <strong style={{color:T.text}}>{F[br.t]||"🏳"} {br.t}</strong></div>}
         </Card>
         <Card icon="⚽" title="Meilleur buteur" sub="Quel joueur va marquer le plus de buts ?" pts={6} correct={scrOk} revealed={!!br.s}>
           <ScorerPlayerPicker value={preds.bonus?.s||""} onChange={v=>onChangeBonus("s",v)}/>
