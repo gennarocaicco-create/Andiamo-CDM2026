@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
@@ -41,49 +40,48 @@
   const MESSAGING = firebase.messaging();
   const VAPID_KEY = "vCz4ZR9hZnTw-utvXvC7dI0-CdCm-p64dITWUes2RxA";
 
-// Service Worker inline
-const SW_CODE = [
-“importScripts(‘https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js’);”,
-“importScripts(‘https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js’);”,
-“firebase.initializeApp({apiKey:‘AIzaSyCM1r38ceXGQz7az9CRhHRZyvTrdhkTVIQ’,authDomain:‘andiamocdm26.firebaseapp.com’,databaseURL:‘https://andiamocdm26-default-rtdb.europe-west1.firebasedatabase.app’,projectId:‘andiamocdm26’,storageBucket:‘andiamocdm26.firebasestorage.app’,messagingSenderId:‘378710185221’,appId:‘1:378710185221:web:6a5601ffaaac04c6d2136c’});”,
-“const messaging=firebase.messaging();”,
-“messaging.onBackgroundMessage(payload=>{”,
-“  const n=payload.notification||{};”,
-“  self.registration.showNotification(n.title||‘Andiamo CDM 2026’,{body:n.body||payload.data&&payload.data.msg||’’,vibrate:[200,100,200]});”,
-“});”
-].join(’\n’);
+  // Service Worker inline
+  const SW_CODE = [
+    "importScripts('https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js');",
+    "importScripts('https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js');",
+    "firebase.initializeApp({apiKey:'AIzaSyCM1r38ceXGQz7az9CRhHRZyvTrdhkTVIQ',authDomain:'andiamocdm26.firebaseapp.com',databaseURL:'https://andiamocdm26-default-rtdb.europe-west1.firebasedatabase.app',projectId:'andiamocdm26',storageBucket:'andiamocdm26.firebasestorage.app',messagingSenderId:'378710185221',appId:'1:378710185221:web:6a5601ffaaac04c6d2136c'});",
+    "const messaging=firebase.messaging();",
+    "messaging.onBackgroundMessage(payload=>{",
+    "  const n=payload.notification||{};",
+    "  self.registration.showNotification(n.title||'Andiamo CDM 2026',{body:n.body||payload.data&&payload.data.msg||'',vibrate:[200,100,200]});",
+    "});"
+  ].join('\n');
 
-async function registerSW() {
-if (!(‘serviceWorker’ in navigator)) return;
-try {
-const blob = new Blob([SW_CODE], {type: ‘application/javascript’});
-const url = URL.createObjectURL(blob);
-await navigator.serviceWorker.register(url);
-console.log(‘SW registered OK’);
-} catch(e) { console.log(‘SW error:’, e); }
-}
-registerSW();
+  async function registerSW() {
+    if (!('serviceWorker' in navigator)) return;
+    try {
+      const blob = new Blob([SW_CODE], {type: 'application/javascript'});
+      const url = URL.createObjectURL(blob);
+      await navigator.serviceWorker.register(url);
+      console.log('SW registered OK');
+    } catch(e) { console.log('SW error:', e); }
+  }
+  registerSW();
 
-async function requestNotifPermission(pseudo) {
-try {
-const permission = await Notification.requestPermission();
-if (permission !== ‘granted’) return;
-await navigator.serviceWorker.ready;
-const token = await MESSAGING.getToken({ vapidKey: VAPID_KEY });
-if (token && pseudo) {
-await DB.ref(`wc26/fcm_tokens/${pseudo}`).set(token);
-console.log(‘FCM token OK’);
-}
-} catch(e) { console.log(‘FCM error:’, e); }
-}
+  async function requestNotifPermission(pseudo) {
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') return;
+      await navigator.serviceWorker.ready;
+      const token = await MESSAGING.getToken({ vapidKey: VAPID_KEY });
+      if (token && pseudo) {
+        await DB.ref(`wc26/fcm_tokens/${pseudo}`).set(token);
+        console.log('FCM token OK');
+      }
+    } catch(e) { console.log('FCM error:', e); }
+  }
 
-async function sendPushNotification(msg) {
-try {
-await DB.ref(‘wc26/push_queue’).push({ msg, ts: Date.now() });
-} catch(e) { console.log(‘Push:’, e); }
-}
+  async function sendPushNotification(msg) {
+    try {
+      await DB.ref('wc26/push_queue').push({ msg, ts: Date.now() });
+    } catch(e) { console.log('Push:', e); }
+  }
 </script>
-
 <script type="text/babel">
 const { useState, useEffect, useRef, useCallback } = React;
 
@@ -1577,8 +1575,9 @@ function App(){
         alert("🔒 Les inscriptions sont clôturées. Contactez l'administrateur.");
         return;
       }
-      // Nouveau joueur → créer le compte avec son mot de passe
-      const np={...players,[name]:{joinedAt:new Date().toISOString()}};
+      // Récupère la liste FRAÎCHE depuis Firebase (évite d'écraser les autres)
+      const freshPlayers = await sg("players", {});
+      const np = {...freshPlayers, [name]:{joinedAt:new Date().toISOString()}};
       setPlayers(np);
       await ss("players",np);
       await ss(`passwords/${name}`, pwd);
@@ -1746,6 +1745,5 @@ function App(){
 
 ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
 </script>
-
 </body>
 </html>
