@@ -13,14 +13,22 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
-// Notification reçue en arrière-plan
 messaging.onBackgroundMessage(payload => {
-  const { title, body } = payload.notification || {};
-  self.registration.showNotification(title || '🏆 Andiamo CDM 2026', {
-    body: body || payload.data?.msg || '',
-    icon: '/Andiamo-CDM2026/icon.svg',
-    badge: '/Andiamo-CDM2026/icon.svg',
+  const n = payload.notification || {};
+  const data = payload.data || {};
+  const title = n.title || '🏆 Andiamo CDM 2026';
+  const body = n.body || data.msg || '';
+  self.registration.showNotification(title, {
+    body: body,
     vibrate: [200, 100, 200],
-    data: payload.data,
+    tag: 'andiamo-notif',
+    requireInteraction: false
   });
+});
+
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  event.waitUntil(
+    clients.openWindow('https://gennarocaicco-create.github.io/Andiamo-CDM2026/')
+  );
 });
