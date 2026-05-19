@@ -57,7 +57,10 @@
     try {
       const permission = await Notification.requestPermission();
       console.log('Notif permission:', permission);
-      if (permission !== 'granted') return;
+      if (permission !== 'granted') {
+        alert('⚠️ Notifications refusées. Allez dans Réglages iPhone → Andiamo CDM → Notifications pour activer.');
+        return;
+      }
       if (!SW_REGISTRATION) {
         await registerSW();
       }
@@ -70,8 +73,14 @@
       if (token && pseudo) {
         await DB.ref(`wc26/fcm_tokens/${pseudo}`).set(token);
         console.log('Token saved for', pseudo);
+        alert('✅ Notifications push activées !');
+      } else {
+        alert('⚠️ Token FCM vide. Réessayez en désinstallant/réinstallant l\'app.');
       }
-    } catch(e) { console.log('FCM error:', e); }
+    } catch(e) {
+      console.log('FCM error:', e);
+      alert('⚠️ Erreur notifications : ' + (e.message || e));
+    }
   }
 
   async function sendPushNotification(msg) {
