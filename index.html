@@ -1618,7 +1618,10 @@ function App(){
 
   const loadLeaderboard=useCallback(async()=>{
     setLbLoading(true);
-    const board=await Promise.all(Object.keys(playersRef.current).map(async p=>{
+    // Toujours recharger la liste fraîche depuis Firebase
+    const freshPlayers = await sg("players", {});
+    setPlayers(freshPlayers);
+    const board=await Promise.all(Object.keys(freshPlayers).map(async p=>{
       const pd=await sg(`predictions/${p}`,{grp:{},ko:{},bonus:{}});
       const score=calcScore(pd,resultsRef.current,koMatchesRef.current,settingsRef.current.bonusResults);
       return{pseudo:p,score,preds:pd};
