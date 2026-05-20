@@ -113,7 +113,15 @@ const { useState, useEffect, useRef, useCallback } = React;
   .wcs::-webkit-scrollbar { height: 3px; width: 3px; } .wcs::-webkit-scrollbar-thumb { background: #1c2a40; border-radius: 2px; }
   .wcs { scrollbar-width: thin; scrollbar-color: #1c2a40 transparent; } select option { background: #111b2d; }
   @keyframes spin { to { transform: rotate(360deg); } } .spin { animation: spin 1s linear infinite; display:inline-block; }
-  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} } .pulse { animation: pulse 1.5s ease-in-out infinite; }`;
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} } .pulse { animation: pulse 1.5s ease-in-out infinite; }
+  @keyframes scoreGlow { 0%,100%{box-shadow:0 0 0 0 #fbbf2400} 50%{box-shadow:0 0 14px 4px #fbbf2466} }
+  .score-glow { animation: scoreGlow 1.2s ease-in-out 2; }
+  @keyframes confettiFall { 0%{transform:translateY(-10vh) rotate(0deg);opacity:1} 100%{transform:translateY(110vh) rotate(720deg);opacity:0} }
+  .confetti-piece { position:fixed; width:10px; height:14px; top:-10px; z-index:9999; pointer-events:none; animation: confettiFall linear forwards; }
+  @keyframes slideDown { from{transform:translateY(-100%);opacity:0} to{transform:translateY(0);opacity:1} }
+  .reminder-banner { animation: slideDown 0.4s ease-out; }
+  @keyframes bounceIn { 0%{transform:scale(0)}60%{transform:scale(1.1)}100%{transform:scale(1)} }
+  .badge-pop { animation: bounceIn 0.5s ease-out; }`;
   document.head.appendChild(s);
 })();
 
@@ -343,6 +351,86 @@ const computeQualified = (results) => {
     return b.gf - a.gf;
   }).slice(0, 8);
   return {standings:allStandings, winners, runnersUp, best3};
+};
+
+// Statistiques personnelles d'un joueur
+const personalStats = (preds, results, koMatches) => {
+  const byTeam = {};
+  const allMatches = [
+    ...GM.map(m => ({...m, isKo:false})),
+    ...KO_ROUNDS.flatMap(r => (koMatches?.[r]||[]).map(m => ({...m, isKo:true})))
+  ];
+  let totalPlayed = 0, totalExact = 0, totalGood = 0, totalMissed = 0;
+  let currentStreak = 0, bestStreak = 0;
+  const sortedMatches = [...allMatches].sort((a,b) => (SCHEDULE[a.id]||'').localeCompare(SCHEDULE[b.id]||''));
+  sortedMatches.forEach(m => {
+    const r = m.isKo ? results?.ko?.[m.id] : results?.grp?.[m.id];
+    if (!r) return;
+    const p = m.isKo ? preds?.ko?.[m.id] : preds?.grp?.[m.id];
+    const pts = matchPts(p, r);
+    if (pts == null) return;
+    totalPlayed++;
+    if (pts === 2) { totalExact++; currentStreak++; }
+    else if (pts === 1) { totalGood++; currentStreak++; }
+    else { totalMissed++; if (currentStreak > bestStreak) bestStreak = currentStreak; currentStreak = 0; }
+    [m.h, m.a].forEach(team => {
+      if (!byTeam[team]) byTeam[team] = {team, played:0, exact:0, good:0, missed:0};
+      byTeam[team].played++;
+      if (pts === 2) byTeam[team].exact++;
+      else if (pts === 1) byTeam[team].good++;
+      else byTeam[team].missed++;
+    });
+  });
+  if (currentStreak > bestStreak) bestStreak = currentStreak;
+  const teamsArr = Object.values(byTeam).filter(t => t.played >= 2);
+  const luckyTeam = teamsArr.length > 0 ? teamsArr.reduce((a,b) => {
+    const aRate = (a.exact*2 + a.good) / a.played;
+    const bRate = (b.exact*2 + b.good) / b.played;
+    return bRate > aRate ? b : a;
+  }) : null;
+  const unluckyTeam = teamsArr.length > 0 ? teamsArr.reduce((a,b) => {
+    const aRate = (a.exact*2 + a.good) / a.played;
+    const bRate = (b.exact*2 + b.good) / b.played;
+    return bRate < aRate ? b : a;
+  }) : null;
+  const accuracy = totalPlayed > 0 ? Math.round((totalExact*2 + totalGood) / (totalPlayed*2) * 100) : 0;
+  return {byTeam, totalPlayed, totalExact, totalGood, totalMissed, currentStreak, bestStreak, luckyTeam, unluckyTeam, accuracy};
+};
+
+// Badges débloqués
+const calcAchievements = (stats, score, position, totalPlayers) => {
+  const badges = [];
+  if (score.exact >= 1) badges.push({id:"first-exact",icon:"🎯",title:"Premier score exact",desc:"Tu as trouvé un score exact !",rarity:"common"});
+  if (score.exact >= 5) badges.push({id:"five-exact",icon:"🎯",title:"Pronostiqueur précis",desc:"5 scores exacts",rarity:"rare"});
+  if (score.exact >= 10) badges.push({id:"ten-exact",icon:"💎",title:"Maître du score",desc:"10 scores exacts",rarity:"epic"});
+  if (score.total >= 25) badges.push({id:"pts-25",icon:"⭐",title:"25 points",desc:"Cap des 25 points franchi",rarity:"common"});
+  if (score.total >= 50) badges.push({id:"pts-50",icon:"🌟",title:"50 points",desc:"Cap des 50 points franchi",rarity:"rare"});
+  if (score.total >= 100) badges.push({id:"pts-100",icon:"🏆",title:"100 points",desc:"Cap mythique des 100 points !",rarity:"legendary"});
+  if (stats.bestStreak >= 3) badges.push({id:"streak-3",icon:"🔥",title:"3 d'affilée",desc:"3 bons pronostics consécutifs",rarity:"common"});
+  if (stats.bestStreak >= 5) badges.push({id:"streak-5",icon:"🔥",title:"5 d'affilée",desc:"5 bons pronostics consécutifs",rarity:"rare"});
+  if (stats.bestStreak >= 10) badges.push({id:"streak-10",icon:"💥",title:"10 d'affilée",desc:"Incroyable série de 10 !",rarity:"legendary"});
+  if (position === 1 && totalPlayers >= 3) badges.push({id:"leader",icon:"👑",title:"Leader",desc:"Tu es en tête !",rarity:"epic"});
+  if (position <= 3 && totalPlayers >= 5) badges.push({id:"podium",icon:"🏅",title:"Sur le podium",desc:"Top 3 du classement",rarity:"rare"});
+  if (stats.accuracy >= 50 && stats.totalPlayed >= 10) badges.push({id:"sharp",icon:"🎯",title:"Œil de lynx",desc:"50% de précision sur 10+ matchs",rarity:"epic"});
+  if (score.bonus >= 6) badges.push({id:"bonus-hunter",icon:"🌟",title:"Chasseur de bonus",desc:"Au moins un bonus trouvé",rarity:"rare"});
+  return badges;
+};
+
+// Confettis !
+const launchConfetti = () => {
+  const colors = ['#fbbf24','#22c55e','#60a5fa','#f87171','#a78bfa','#f97316'];
+  const root = document.body;
+  for (let i = 0; i < 60; i++) {
+    const piece = document.createElement('div');
+    piece.className = 'confetti-piece';
+    piece.style.left = Math.random()*100 + 'vw';
+    piece.style.background = colors[Math.floor(Math.random()*colors.length)];
+    piece.style.animationDuration = (2 + Math.random()*2) + 's';
+    piece.style.animationDelay = (Math.random()*0.5) + 's';
+    piece.style.transform = `rotate(${Math.random()*360}deg)`;
+    root.appendChild(piece);
+    setTimeout(() => piece.remove(), 5000);
+  }
 };
 
 // ── Appel API Claude avec web search pour récupérer les scores
@@ -722,7 +810,7 @@ function KoPage({preds,results,koMatches,settings,activeRound,setActiveRound,onC
   );
 }
 
-function LeaderboardPage({leaderboard,prevLeaderboard,loading,myPseudo,onRefresh,results,schedule,koMatches}){
+function LeaderboardPage({leaderboard,prevLeaderboard,loading,myPseudo,onRefresh,results,schedule,koMatches,history}){
   const medals=["🥇","🥈","🥉"];
   const[expanded,setExpanded]=useState(null);
 
@@ -766,6 +854,13 @@ function LeaderboardPage({leaderboard,prevLeaderboard,loading,myPseudo,onRefresh
       {!hasLocked&&(
         <div style={{background:T.card,borderRadius:10,padding:"10px 14px",marginBottom:14,fontSize:12,color:T.muted,border:`1px solid ${T.border}`}}>
           🔒 Les pronostics des autres joueurs seront visibles ici dès qu'un match sera lancé.
+        </div>
+      )}
+
+      {/* Graphique d'évolution */}
+      {history && history.length >= 2 && (
+        <div style={{marginBottom:14}}>
+          <HistoryGraph history={history} myPseudo={myPseudo}/>
         </div>
       )}
 
@@ -1615,6 +1710,306 @@ Si aucun match n'est terminé, réponds : {"results":[]}`;
 }
 
 // ════════════════════════════════════════════
+// COMPOSANTS BONUS — Profile, History, Today, Final
+// ════════════════════════════════════════════
+
+function HistoryGraph({history, myPseudo}){
+  if (!history || history.length < 2) {
+    return(
+      <div style={{background:T.card,borderRadius:12,padding:24,textAlign:"center",border:`1px solid ${T.border}`,color:T.muted,fontSize:13}}>
+        📈 L'historique apparaîtra après plusieurs journées de matchs.
+      </div>
+    );
+  }
+  const W = 320, H = 200, padL = 30, padR = 10, padT = 15, padB = 25;
+  const innerW = W - padL - padR, innerH = H - padT - padB;
+  const players = Array.from(new Set(history.flatMap(s => s.board.map(p => p.pseudo))));
+  const maxPos = players.length;
+  const colors = ["#fbbf24","#22c55e","#60a5fa","#f87171","#a78bfa","#f97316","#ec4899","#14b8a6","#84cc16","#eab308"];
+  const playerLines = players.map((pseudo, idx) => {
+    const points = history.map((snap, i) => {
+      const found = snap.board.findIndex(p => p.pseudo === pseudo);
+      const pos = found === -1 ? maxPos : found + 1;
+      const x = padL + (i/(history.length-1)) * innerW;
+      const y = padT + ((pos-1)/(Math.max(1,maxPos-1))) * innerH;
+      return {x, y};
+    });
+    return {pseudo, points, color: pseudo === myPseudo ? "#fbbf24" : colors[idx % colors.length]};
+  });
+  return(
+    <div style={{background:T.card,borderRadius:12,padding:14,border:`1px solid ${T.border}`,overflow:"auto"}}>
+      <div style={{fontSize:12,fontWeight:600,color:T.muted,marginBottom:8,textTransform:"uppercase",letterSpacing:1}}>📈 Évolution du classement</div>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{width:"100%",height:"auto",maxWidth:500}}>
+        {[1,Math.ceil(maxPos/2),maxPos].filter((v,i,a)=>a.indexOf(v)===i).map(pos => {
+          const y = padT + ((pos-1)/(Math.max(1,maxPos-1))) * innerH;
+          return(
+            <g key={pos}>
+              <line x1={padL} y1={y} x2={W-padR} y2={y} stroke="#1c2a40" strokeDasharray="2,2"/>
+              <text x={padL-5} y={y+3} fill="#64748b" fontSize="9" textAnchor="end">{pos}</text>
+            </g>
+          );
+        })}
+        {history.map((snap, i) => {
+          const x = padL + (i/(history.length-1)) * innerW;
+          return <text key={i} x={x} y={H-8} fill="#64748b" fontSize="8" textAnchor="middle">J{i+1}</text>;
+        })}
+        {playerLines.map(line => {
+          const isMe = line.pseudo === myPseudo;
+          const path = line.points.map((p,i) => `${i===0?"M":"L"}${p.x},${p.y}`).join(" ");
+          return(
+            <g key={line.pseudo}>
+              <path d={path} stroke={line.color} strokeWidth={isMe?2.5:1.2} fill="none" opacity={isMe?1:0.5}/>
+              {line.points.map((p,i) => (
+                <circle key={i} cx={p.x} cy={p.y} r={isMe?3:2} fill={line.color} opacity={isMe?1:0.5}/>
+              ))}
+              <text x={W-padR+2} y={line.points[line.points.length-1].y+3} fill={line.color} fontSize={isMe?10:8} fontWeight={isMe?700:400} opacity={isMe?1:0.7}>
+                {line.pseudo.substring(0,8)}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+      <div style={{fontSize:10,color:T.muted,marginTop:6,textAlign:"center"}}>Position 1 = en haut · Ta ligne en or doré</div>
+    </div>
+  );
+}
+
+function TodaySection({preds,schedule,results,koMatches,onSelectMatch}){
+  const now = new Date();
+  const in24h = new Date(now.getTime() + 24*60*60*1000);
+  const allMatches = [
+    ...GM.map(m => ({...m, type:"grp"})),
+    ...KO_ROUNDS.flatMap(r => (koMatches?.[r]||[]).map(m => ({...m, type:"ko"})))
+  ];
+  const upcoming = allMatches
+    .filter(m => {
+      const ko = schedule[m.id];
+      if (!ko) return false;
+      const koDate = new Date(ko);
+      return koDate >= now && koDate <= in24h;
+    })
+    .sort((a,b) => new Date(schedule[a.id]) - new Date(schedule[b.id]));
+
+  if (upcoming.length === 0) return null;
+
+  const notPredicted = upcoming.filter(m => {
+    const p = m.type === "grp" ? preds.grp?.[m.id] : preds.ko?.[m.id];
+    return !p || p.h === "" || p.h == null;
+  });
+
+  return(
+    <div style={{background:"linear-gradient(135deg,#10192b,#0a2a1a)",borderRadius:14,padding:16,marginBottom:16,border:"1px solid #22c55e44"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+        <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:17,fontWeight:700,color:T.green}}>⚡ Matchs des prochaines 24h</div>
+        {notPredicted.length>0 && <span style={{fontSize:11,color:T.red,background:T.red+"22",padding:"2px 8px",borderRadius:20,fontWeight:600}}>⚠️ {notPredicted.length} à pronostiquer</span>}
+      </div>
+      <div style={{display:"flex",flexDirection:"column",gap:6}}>
+        {upcoming.slice(0,5).map(m => {
+          const ko = new Date(schedule[m.id]);
+          const timeStr = ko.toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"});
+          const isToday = ko.toDateString() === now.toDateString();
+          const dayStr = isToday ? "Aujourd'hui" : ko.toLocaleDateString("fr-FR",{weekday:"short",day:"2-digit",month:"short"});
+          const p = m.type === "grp" ? preds.grp?.[m.id] : preds.ko?.[m.id];
+          const hasPred = p && p.h !== "" && p.h != null;
+          return(
+            <div key={m.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",background:T.card,borderRadius:8,padding:"8px 12px",border:`1px solid ${hasPred?T.green+"44":T.red+"44"}`}}>
+              <div style={{display:"flex",alignItems:"center",gap:8,minWidth:0,flex:1}}>
+                <div style={{fontSize:11,color:T.blue,fontWeight:600,flexShrink:0,minWidth:80}}>{dayStr} · {timeStr}</div>
+                <div style={{fontSize:13,color:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{F[m.h]||"🏳"} {m.h} <span style={{color:T.muted}}>vs</span> {F[m.a]||"🏳"} {m.a}</div>
+              </div>
+              {hasPred ? <span style={{fontSize:12,color:T.green,fontWeight:700,flexShrink:0}}>{p.h}–{p.a}</span> : <span style={{fontSize:11,color:T.red,fontWeight:600,flexShrink:0}}>⚠️ vide</span>}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function ReminderBanner({preds,schedule}){
+  const[show,setShow]=useState(false);
+  const[matches,setMatches]=useState([]);
+  useEffect(() => {
+    const check = () => {
+      const now = new Date();
+      const in1h = new Date(now.getTime() + 60*60*1000);
+      const need = GM.filter(m => {
+        const ko = schedule[m.id];
+        if (!ko) return false;
+        const koDate = new Date(ko);
+        if (koDate < now || koDate > in1h) return false;
+        const p = preds.grp?.[m.id];
+        return !p || p.h === "" || p.h == null;
+      });
+      setMatches(need);
+      setShow(need.length > 0);
+    };
+    check();
+    const i = setInterval(check, 60000);
+    return () => clearInterval(i);
+  }, [preds, schedule]);
+  if (!show) return null;
+  return(
+    <div className="reminder-banner" style={{position:"sticky",top:54,zIndex:99,background:"linear-gradient(135deg,#7c2d12,#991b1b)",padding:"10px 16px",borderBottom:`1px solid #ef444466`,display:"flex",alignItems:"center",gap:10}}>
+      <span style={{fontSize:20}}>⏰</span>
+      <div style={{flex:1,fontSize:13,color:"#fff",fontWeight:500,lineHeight:1.4}}>
+        <strong>{matches.length} match{matches.length>1?"s":""}</strong> dans moins d'1h sans pronostic ! Vite, va dans Matchs 🔥
+      </div>
+    </div>
+  );
+}
+
+function ProfilePage({pseudo,preds,results,koMatches,settings,leaderboard,history}){
+  const stats = personalStats(preds, results, koMatches);
+  const myEntry = leaderboard.find(p => p.pseudo === pseudo);
+  const myPos = myEntry ? leaderboard.findIndex(p => p.pseudo === pseudo) + 1 : 0;
+  const myScore = myEntry ? myEntry.score : {total:0,exact:0,good:0,bonus:0};
+  const badges = calcAchievements(stats, myScore, myPos, leaderboard.length);
+
+  const rarityColors = {common:T.muted, rare:T.blue, epic:T.purple, legendary:T.gold};
+
+  return(
+    <div style={{paddingTop:20}}>
+      <PageTitle sub="Tes statistiques personnelles">👤 PROFIL — {pseudo}</PageTitle>
+
+      {/* Bloc résumé */}
+      <div style={{background:"linear-gradient(135deg,#1a1300,#10192b)",borderRadius:14,padding:18,marginBottom:14,border:`1px solid ${T.gold}44`}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
+          <div>
+            <div style={{fontSize:12,color:T.muted}}>Position actuelle</div>
+            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:32,fontWeight:800,color:T.gold,lineHeight:1}}>{myPos > 0 ? `${myPos}${myPos===1?"er":"ème"}` : "—"}<span style={{fontSize:14,color:T.muted,fontWeight:400}}> / {leaderboard.length}</span></div>
+          </div>
+          <div>
+            <div style={{fontSize:12,color:T.muted}}>Total points</div>
+            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:32,fontWeight:800,color:T.text,lineHeight:1}}>{myScore.total}</div>
+          </div>
+          <div>
+            <div style={{fontSize:12,color:T.muted}}>Précision</div>
+            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:32,fontWeight:800,color:stats.accuracy>=50?T.green:stats.accuracy>=30?T.blue:T.muted,lineHeight:1}}>{stats.accuracy}<span style={{fontSize:14,fontWeight:400}}>%</span></div>
+          </div>
+        </div>
+      </div>
+
+      {/* Achievements */}
+      <div style={{background:T.card,borderRadius:14,padding:16,marginBottom:14,border:`1px solid ${T.border}`}}>
+        <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:17,fontWeight:700,color:T.gold,marginBottom:10}}>🏅 BADGES DÉBLOQUÉS ({badges.length})</div>
+        {badges.length === 0 ? (
+          <div style={{color:T.muted,fontSize:13,padding:10,textAlign:"center"}}>Aucun badge pour le moment. Continue à pronostiquer ! 💪</div>
+        ) : (
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:8}}>
+            {badges.map(b => (
+              <div key={b.id} className="badge-pop" style={{background:T.card2,border:`1px solid ${rarityColors[b.rarity]}66`,borderRadius:10,padding:"10px 12px",textAlign:"center"}}>
+                <div style={{fontSize:28,marginBottom:4}}>{b.icon}</div>
+                <div style={{fontSize:12,fontWeight:700,color:rarityColors[b.rarity]}}>{b.title}</div>
+                <div style={{fontSize:10,color:T.muted,marginTop:2,lineHeight:1.3}}>{b.desc}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Stats détaillées */}
+      {stats.totalPlayed > 0 && (
+        <div style={{background:T.card,borderRadius:14,padding:16,marginBottom:14,border:`1px solid ${T.border}`}}>
+          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:17,fontWeight:700,color:T.gold,marginBottom:12}}>📊 TES STATS</div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:10,marginBottom:14}}>
+            <div style={{background:T.card2,borderRadius:8,padding:10,textAlign:"center"}}>
+              <div style={{fontSize:24,fontWeight:800,color:T.green,fontFamily:"'Barlow Condensed',sans-serif"}}>{stats.totalExact}</div>
+              <div style={{fontSize:11,color:T.muted}}>Scores exacts</div>
+            </div>
+            <div style={{background:T.card2,borderRadius:8,padding:10,textAlign:"center"}}>
+              <div style={{fontSize:24,fontWeight:800,color:T.blue,fontFamily:"'Barlow Condensed',sans-serif"}}>{stats.totalGood}</div>
+              <div style={{fontSize:11,color:T.muted}}>Bons résultats</div>
+            </div>
+            <div style={{background:T.card2,borderRadius:8,padding:10,textAlign:"center"}}>
+              <div style={{fontSize:24,fontWeight:800,color:T.red,fontFamily:"'Barlow Condensed',sans-serif"}}>{stats.totalMissed}</div>
+              <div style={{fontSize:11,color:T.muted}}>Ratés</div>
+            </div>
+            <div style={{background:T.card2,borderRadius:8,padding:10,textAlign:"center"}}>
+              <div style={{fontSize:24,fontWeight:800,color:T.gold,fontFamily:"'Barlow Condensed',sans-serif"}}>{stats.bestStreak}</div>
+              <div style={{fontSize:11,color:T.muted}}>Meilleure série 🔥</div>
+            </div>
+          </div>
+          {stats.luckyTeam && (
+            <div style={{padding:"10px 14px",background:"#0a2a1a",borderRadius:8,marginBottom:8,fontSize:13,color:T.text}}>
+              🍀 <strong>Équipe porte-bonheur :</strong> {F[stats.luckyTeam.team]||"🏳"} {stats.luckyTeam.team} ({stats.luckyTeam.exact}/{stats.luckyTeam.played} exacts)
+            </div>
+          )}
+          {stats.unluckyTeam && stats.unluckyTeam.team !== stats.luckyTeam?.team && (
+            <div style={{padding:"10px 14px",background:"#2a1010",borderRadius:8,fontSize:13,color:T.text}}>
+              😬 <strong>Bête noire :</strong> {F[stats.unluckyTeam.team]||"🏳"} {stats.unluckyTeam.team} ({stats.unluckyTeam.missed}/{stats.unluckyTeam.played} ratés)
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Graphique historique */}
+      <div style={{marginBottom:14}}>
+        <HistoryGraph history={history} myPseudo={pseudo}/>
+      </div>
+    </div>
+  );
+}
+
+function FinalRecap({results,koMatches,leaderboard,history,settings}){
+  const finalMatch = (koMatches?.["Finale"]||[])[0];
+  const finalRes = finalMatch ? results?.ko?.[finalMatch.id] : null;
+  const isFinished = finalRes && finalRes.h != null;
+  if (!isFinished || leaderboard.length === 0) return null;
+  const winner = finalRes.h > finalRes.a ? finalMatch.h : finalRes.a > finalRes.h ? finalMatch.a : null;
+  const champion = leaderboard[0];
+  const bestExact = [...leaderboard].sort((a,b) => b.score.exact - a.score.exact)[0];
+  // Plus grosse remontée
+  let biggestComeback = null;
+  if (history && history.length >= 2) {
+    const first = history[0].board;
+    const last = history[history.length-1].board;
+    leaderboard.forEach(p => {
+      const startIdx = first.findIndex(x => x.pseudo === p.pseudo);
+      const endIdx = last.findIndex(x => x.pseudo === p.pseudo);
+      if (startIdx === -1 || endIdx === -1) return;
+      const gain = startIdx - endIdx;
+      if (!biggestComeback || gain > biggestComeback.gain) biggestComeback = {pseudo:p.pseudo, gain, from:startIdx+1, to:endIdx+1};
+    });
+  }
+  return(
+    <div style={{background:"linear-gradient(135deg,#1a1300,#0d1a30,#10192b)",borderRadius:16,padding:24,marginBottom:16,border:`2px solid ${T.gold}`}}>
+      <div style={{textAlign:"center",marginBottom:20}}>
+        <div style={{fontSize:48,marginBottom:8}}>🏆</div>
+        <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:30,fontWeight:800,color:T.gold,letterSpacing:2}}>FIN DU TOURNOI</div>
+        <div style={{fontSize:14,color:T.muted,marginTop:6}}>Voici le récapitulatif d'Andiamo CDM 2026</div>
+      </div>
+      {winner && (
+        <div style={{textAlign:"center",marginBottom:18,padding:16,background:"#0a2a1a",borderRadius:12,border:`1px solid ${T.green}44`}}>
+          <div style={{fontSize:12,color:T.muted,marginBottom:4}}>VAINQUEUR DE LA COUPE</div>
+          <div style={{fontSize:36}}>{F[winner]||"🏳"}</div>
+          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:24,fontWeight:800,color:T.green}}>{winner}</div>
+        </div>
+      )}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:10}}>
+        <div style={{background:T.card,borderRadius:10,padding:14,textAlign:"center",border:`1px solid ${T.gold}44`}}>
+          <div style={{fontSize:11,color:T.muted,marginBottom:4}}>👑 CHAMPION ANDIAMO</div>
+          <div style={{fontSize:18,fontWeight:800,color:T.gold}}>{champion.pseudo}</div>
+          <div style={{fontSize:12,color:T.muted}}>{champion.score.total} pts</div>
+        </div>
+        <div style={{background:T.card,borderRadius:10,padding:14,textAlign:"center",border:`1px solid ${T.green}44`}}>
+          <div style={{fontSize:11,color:T.muted,marginBottom:4}}>🎯 MEILLEUR PRONOS</div>
+          <div style={{fontSize:18,fontWeight:800,color:T.green}}>{bestExact.pseudo}</div>
+          <div style={{fontSize:12,color:T.muted}}>{bestExact.score.exact} scores exacts</div>
+        </div>
+        {biggestComeback && biggestComeback.gain > 0 && (
+          <div style={{background:T.card,borderRadius:10,padding:14,textAlign:"center",border:`1px solid ${T.purple}44`}}>
+            <div style={{fontSize:11,color:T.muted,marginBottom:4}}>🚀 PLUS GROSSE REMONTÉE</div>
+            <div style={{fontSize:18,fontWeight:800,color:T.purple}}>{biggestComeback.pseudo}</div>
+            <div style={{fontSize:12,color:T.muted}}>{biggestComeback.from}ème → {biggestComeback.to}ème</div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════
 // APP PRINCIPALE
 // ════════════════════════════════════════════
 function App(){
@@ -1638,6 +2033,8 @@ function App(){
   const[lbLoading,setLbLoading]=useState(false);
   const[schedule,setSchedule]=useState({});
   const[scheduleLoading,setScheduleLoading]=useState(true);
+  const[history,setHistory]=useState([]);
+  const lastResultsHashRef=useRef("");
   const { liveData, lastUpdate } = useLiveScores(isAdmin);
 
   const saveTimer=useRef(null);
@@ -1650,8 +2047,8 @@ function App(){
 
   useEffect(()=>{
     (async()=>{
-      const[pl,res,set,ko,nf]=await Promise.all([sg("players",{}),sg("results",{grp:{},ko:{}}),sg("settings",{phase:"groups",bonusResults:{}}),sg("koMatches",{}),sg("notifs",[])]);
-      setPlayers(pl);setResults(res);setSettings(set);setKoMatches(ko);setNotifs(nf||[]);setLoading(false);
+      const[pl,res,set,ko,nf,hi]=await Promise.all([sg("players",{}),sg("results",{grp:{},ko:{}}),sg("settings",{phase:"groups",bonusResults:{}}),sg("koMatches",{}),sg("notifs",[]),sg("leaderboard_history",[])]);
+      setPlayers(pl);setResults(res);setSettings(set);setKoMatches(ko);setNotifs(nf||[]);setHistory(hi||[]);setLoading(false);
       setSchedule(SCHEDULE);
       setScheduleLoading(false);
       // Récupération automatique du pseudo sauvegardé
@@ -1736,6 +2133,21 @@ function App(){
   const saveResult=async(type,id,h,a)=>{
     const updated={...results,[type]:{...results[type],[id]:{h,a}}};
     setResults(updated);await ss("results",updated);
+    // Snapshot du classement après chaque résultat
+    try {
+      const allPlayers = await sg("players", {});
+      const board = await Promise.all(Object.keys(allPlayers).map(async pk => {
+        const pd = await sg(`predictions/${pk}`, {grp:{},ko:{},bonus:{}});
+        const score = calcScore(pd, updated, koMatchesRef.current, settingsRef.current.bonusResults);
+        return {pseudo:pk, total:score.total, exact:score.exact, good:score.good};
+      }));
+      board.sort((a,b) => b.total - a.total);
+      const snapshot = {ts: Date.now(), board};
+      const hist = await sg("leaderboard_history", []);
+      const newHist = [...(hist||[]), snapshot].slice(-30);
+      await ss("leaderboard_history", newHist);
+      setHistory(newHist);
+    } catch(e) { console.log("history snap err",e); }
   };
   const deleteResult=async(type,id)=>{
     const updated={...results,[type]:{...results[type]}};delete updated[type][id];
@@ -1780,6 +2192,64 @@ function App(){
 
   useEffect(()=>{if(page==="leaderboard")loadLeaderboard();},[page]);
 
+  // Détection score exact → confettis 🎉
+  const seenExactsRef = useRef(new Set());
+  useEffect(() => {
+    if (!pseudo || pseudo === "__admin" || !preds) return;
+    const newExacts = [];
+    GM.forEach(m => {
+      const r = results?.grp?.[m.id];
+      const p = preds.grp?.[m.id];
+      if (r && p && matchPts(p,r) === 2) {
+        const key = "grp_" + m.id;
+        if (!seenExactsRef.current.has(key)) newExacts.push(key);
+      }
+    });
+    KO_ROUNDS.forEach(rd => (koMatches[rd]||[]).forEach(m => {
+      const r = results?.ko?.[m.id];
+      const p = preds.ko?.[m.id];
+      if (r && p && matchPts(p,r) === 2) {
+        const key = "ko_" + m.id;
+        if (!seenExactsRef.current.has(key)) newExacts.push(key);
+      }
+    }));
+    // Skip first render to avoid confetti on app load
+    if (seenExactsRef.current.size === 0 && newExacts.length > 0) {
+      newExacts.forEach(k => seenExactsRef.current.add(k));
+      return;
+    }
+    if (newExacts.length > 0) {
+      newExacts.forEach(k => seenExactsRef.current.add(k));
+      launchConfetti();
+      setTimeout(launchConfetti, 800);
+    }
+  }, [results, preds, koMatches, pseudo]);
+
+  // Rappel match dans 1h sans pronostic → notif push auto (déclenché 1x par match)
+  const remindedRef = useRef(new Set());
+  useEffect(() => {
+    if (!pseudo || pseudo === "__admin") return;
+    const check = () => {
+      const now = new Date();
+      const in1h = new Date(now.getTime() + 60*60*1000);
+      GM.forEach(m => {
+        const ko = SCHEDULE[m.id];
+        if (!ko) return;
+        const koDate = new Date(ko);
+        if (koDate < now || koDate > in1h) return;
+        const p = preds.grp?.[m.id];
+        if (p && p.h !== "" && p.h != null) return;
+        const key = "rem_" + m.id;
+        if (remindedRef.current.has(key)) return;
+        remindedRef.current.add(key);
+        sendPushNotification(`⏰ ${m.h} vs ${m.a} dans moins d'1h ! N'oublie pas ton pronostic.`);
+      });
+    };
+    check();
+    const i = setInterval(check, 5*60*1000);
+    return () => clearInterval(i);
+  }, [pseudo, preds]);
+
   const myScore=calcScore(preds,results,koMatches,settings.bonusResults);
 
   if(loading) return(<div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh",background:T.bg,color:T.muted,fontFamily:"Inter,sans-serif",fontSize:16}}>Chargement…</div>);
@@ -1797,6 +2267,7 @@ function App(){
     {id:"leaderboard",icon:"📊",label:"Classement"},
     {id:"knockout",icon:"🏆",label:"Finale"},
     {id:"bonus",icon:"⭐",label:"Bonus"},
+    {id:"profile",icon:"👤",label:"Profil"},
     {id:"notifs",icon:"🔔",label:"Notifs",badge:unreadCount},
   ];
 
@@ -1835,12 +2306,24 @@ function App(){
         </div>
       </div>
 
+      {/* Bannière rappel si match dans 1h sans pronostic */}
+      {!isAdmin && <ReminderBanner preds={preds} schedule={schedule}/>}
+
       {/* Contenu */}
       <div style={{padding:"0 16px 90px"}}>
-        {page==="groups"&&<GroupsPage preds={preds} results={results} activeGroup={activeGroup} setActiveGroup={setActiveGroup} onChangePred={onChangePred} schedule={schedule} scheduleLoading={scheduleLoading} liveData={liveData}/>}
+        {/* Récap final si tournoi terminé */}
+        {!isAdmin && page !== "welcome" && <FinalRecap results={results} koMatches={koMatches} leaderboard={leaderboard} history={history} settings={settings}/>}
+
+        {page==="groups"&&(<>
+          <div style={{paddingTop:20}}>
+            <TodaySection preds={preds} schedule={schedule} results={results} koMatches={koMatches}/>
+          </div>
+          <GroupsPage preds={preds} results={results} activeGroup={activeGroup} setActiveGroup={setActiveGroup} onChangePred={onChangePred} schedule={schedule} scheduleLoading={scheduleLoading} liveData={liveData}/>
+        </>)}
         {page==="bonus"&&<BonusPage preds={preds} settings={settings} onChangeBonus={onChangeBonus}/>}
         {page==="knockout"&&<KoPage preds={preds} results={results} koMatches={koMatches} settings={settings} activeRound={activeRound} setActiveRound={setActiveRound} onChangePred={onChangePred} schedule={schedule} liveData={liveData}/>}
-        {page==="leaderboard"&&<LeaderboardPage leaderboard={leaderboard} prevLeaderboard={prevLeaderboard} loading={lbLoading} myPseudo={pseudo} onRefresh={loadLeaderboard} results={results} schedule={schedule} koMatches={koMatches}/>}
+        {page==="leaderboard"&&<LeaderboardPage leaderboard={leaderboard} prevLeaderboard={prevLeaderboard} loading={lbLoading} myPseudo={pseudo} onRefresh={loadLeaderboard} results={results} schedule={schedule} koMatches={koMatches} history={history}/>}
+        {page==="profile"&&<ProfilePage pseudo={pseudo} preds={preds} results={results} koMatches={koMatches} settings={settings} leaderboard={leaderboard} history={history}/>}
         {page==="notifs"&&(
           <div style={{paddingTop:20}}>
             <PageTitle sub={`${notifs.length} message${notifs.length>1?"s":""} de l'administrateur`}>🔔 NOTIFICATIONS</PageTitle>
