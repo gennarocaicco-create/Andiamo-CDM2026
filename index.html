@@ -126,13 +126,11 @@ const { useState, useEffect, useRef, useCallback } = React;
 })();
 
 /* ══════════════════════════════════════════════════════
-   🔴 CLÉ API SCORES LIVE
-   → Gratuit sur rapidapi.com → cherchez "API-Football"
-   → Abonnement "Basic" (gratuit, 100 req/jour)
-   → Collez votre clé ici :
+   🔴 CLÉ API SCORES — football-data.org
+   → Gratuit, World Cup 2026 inclus, 10 req/min
 ══════════════════════════════════════════════════════ */
-const RAPIDAPI_KEY = "7a7669d8e7mshd9e7602304c7c00p143ff4jsnc58135eb8c59";
-const API_HOST = "free-api-live-football-data.p.rapidapi.com";
+const FOOTBALL_DATA_TOKEN = "eb4720a764d44d328b4d4046717377eb";
+const FOOTBALL_DATA_BASE = "https://api.football-data.org/v4";
 
 // Correspondance noms équipes EN → FR pour l'API
 const TEAM_MAP_LIVE = {
@@ -151,53 +149,54 @@ const TEAM_MAP_LIVE = {
 };
 const toFR = n => TEAM_MAP_LIVE[n] || n;
 
-const STATUS_LIVE_CODES = ["1H","2H","ET","P","LIVE"];
-const STATUS_FINISHED_CODES = ["FT","AET","PEN","FT_PEN"];
-const STATUS_HT_CODES = ["HT","BT"];
-const STATUS_ET_CODES = ["ET","BT"];
-const STATUS_PEN_CODES = ["P","PEN","FT_PEN"];
+// Statuts football-data.org → notre format
+const isLiveStatus = s => ["IN_PLAY","PAUSED"].includes(s);
+const isFinishedStatus = s => ["FINISHED","AWARDED"].includes(s);
 
-async function fetchLiveMatches() {
+// Cache global : on appelle l'API max 1x toutes les 3 min
+let _wcMatchesCache = { ts: 0, data: [] };
+async function fetchWCMatches() {
+  const now = Date.now();
+  if (now - _wcMatchesCache.ts < 3*60*1000 && _wcMatchesCache.data.length > 0) {
+    return _wcMatchesCache.data;
+  }
   try {
-    const r = await fetch(
-      "https://free-api-live-football-data.p.rapidapi.com/football-current-live",
-      { headers: { "Content-Type":"application/json", "x-rapidapi-host": API_HOST, "x-rapidapi-key": RAPIDAPI_KEY } }
-    );
-    const d = await r.json();
-    const matches = d.response?.live || d.response || d.data || [];
-    return matches.map(m => {
-      const status = m.status?.short || m.statusShort || m.fixture?.status?.short || "";
-      const elapsed = m.status?.elapsed || m.elapsed || m.fixture?.status?.elapsed || null;
-      const homeTeam = m.homeTeam?.name || m.teams?.home?.name || m.home?.name || "";
-      const awayTeam = m.awayTeam?.name || m.teams?.away?.name || m.away?.name || "";
-      const scoreH = m.goals?.home ?? m.score?.home ?? m.homeScore ?? null;
-      const scoreA = m.goals?.away ?? m.score?.away ?? m.awayScore ?? null;
-      const isHT = STATUS_HT_CODES.includes(status);
-      const isET = STATUS_ET_CODES.includes(status);
-      const isPen = STATUS_PEN_CODES.includes(status);
-      return {
-        home: toFR(homeTeam), away: toFR(awayTeam),
-        scoreH, scoreA, status, elapsed,
-        isLive: STATUS_LIVE_CODES.includes(status) || isHT || isET || isPen,
-        isHT, isET, isPen,
-        isFinished: STATUS_FINISHED_CODES.includes(status),
-      };
-    }).filter(m => m.home && m.away);
-  } catch { return []; }
+    const r = await fetch(`${FOOTBALL_DATA_BASE}/competitions/WC/matches`, {
+      headers: { "X-Auth-Token": FOOTBALL_DATA_TOKEN }
+    });
+    if (!r.ok) return _wcMatchesCache.data;
+    const data = await r.json();
+    const matches = (data.matches || []).map(m => ({
+      home: toFR(m.homeTeam?.name || ""),
+      away: toFR(m.awayTeam?.name || ""),
+      scoreH: m.score?.fullTime?.home ?? null,
+      scoreA: m.score?.fullTime?.away ?? null,
+      status: m.status,
+      elapsed: m.minute || null,
+      isLive: isLiveStatus(m.status),
+      isHT: m.status === "PAUSED",
+      isET: false,
+      isPen: false,
+      isFinished: isFinishedStatus(m.status),
+      utcDate: m.utcDate
+    })).filter(m => m.home && m.away);
+    _wcMatchesCache = { ts: now, data: matches };
+    return matches;
+  } catch(e) { console.log("WC fetch err:", e); return _wcMatchesCache.data; }
 }
 
-// Hook : scores live rafraîchis toutes les 30s
+// Hook : scores live (rafraîchis toutes les 3 min — cache global de toute façon)
 function useLiveScores(isAdmin=false) {
   const [liveData, setLiveData] = useState([]);
   const [lastUpdate, setLastUpdate] = useState(null);
   useEffect(() => {
     if(isAdmin) return; // Pas de polling en mode admin
     const run = async () => {
-      const data = await fetchLiveMatches();
+      const data = await fetchWCMatches();
       if (data.length > 0) { setLiveData(data); setLastUpdate(new Date()); }
     };
     run();
-    const interval = setInterval(run, 30000);
+    const interval = setInterval(run, 3*60*1000); // 3 minutes
     return () => clearInterval(interval);
   }, [isAdmin]);
   return { liveData, lastUpdate };
@@ -433,30 +432,11 @@ const launchConfetti = () => {
   }
 };
 
-// ── Appel API Claude avec web search pour récupérer les scores
-async function fetchScoresFromWeb(prompt) {
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 1000,
-      tools: [{ type: "web_search_20250305", name: "web_search" }],
-      messages: [{ role: "user", content: prompt }]
-    })
-  });
-  if (!response.ok) throw new Error(`API error: ${response.status}`);
-  const data = await response.json();
-  // Extraire le texte de la réponse (ignorer les blocs tool_use)
-  const text = (data.content || [])
-    .filter(b => b.type === "text")
-    .map(b => b.text)
-    .join("");
-  // Nettoyer et parser le JSON
-  const clean = text.replace(/```json|```/g, "").trim();
-  const match = clean.match(/\{[\s\S]*\}/);
-  if (!match) throw new Error("Pas de JSON dans la réponse");
-  return JSON.parse(match[0]);
+// ── Sync scores via football-data.org (gratuit, World Cup 2026 inclus)
+async function fetchScoresFromWeb() {
+  // Force le refresh du cache pour avoir les derniers scores
+  _wcMatchesCache.ts = 0;
+  return await fetchWCMatches();
 }
 
 
@@ -1495,71 +1475,62 @@ function AdminPage({results,settings,koMatches,players,saveResult,deleteResult,s
     if(h!==""&&a!==""){saveResult(type,id,+h,+a);setSaved(p=>({...p,[id]:true}));setTimeout(()=>setSaved(p=>{const n={...p};delete n[id];return n;}),2000);}
   };
 
-  // ── SYNC AUTOMATIQUE — Phase de groupes
+  // ── SYNC AUTOMATIQUE — Phase de groupes (via football-data.org)
   const syncGroupResults = async () => {
-    setSyncing(true); setSyncMsg("🔍 Recherche des scores officiels sur le web…");
+    setSyncing(true); setSyncMsg("🔍 Récupération des scores officiels…");
     try {
-      const matchList = GM.map(m => `${m.id}|${m.h}|${m.a}|Groupe ${m.g}`).join('\n');
-      const prompt = `Tu es un assistant qui récupère les scores de matchs de football.
-Cherche sur le web les scores OFFICIELS ET DÉFINITIFS des matchs de la phase de groupes de la Coupe du Monde FIFA 2026.
-
-Liste des matchs (id|domicile|extérieur|groupe) :
-${matchList}
-
-IMPORTANT : n'inclus que les matchs terminés avec un score final. Ignore les matchs non joués.
-Réponds UNIQUEMENT avec un objet JSON valide, sans markdown, sans explication :
-{"results":[{"id":"M01","h":2,"a":1},{"id":"M05","h":0,"a":0},...]}
-Si aucun match n'est terminé, réponds : {"results":[]}`;
-
-      const parsed = await fetchScoresFromWeb(prompt);
-      const rs = parsed.results || [];
-      if (rs.length === 0) { setSyncMsg("ℹ️ Aucun match terminé trouvé pour le moment."); setSyncing(false); return; }
+      const wcMatches = await fetchScoresFromWeb();
+      if (wcMatches.length === 0) { setSyncMsg("⚠ Impossible de récupérer les données. Réessayez."); setSyncing(false); return; }
+      const finishedOnly = wcMatches.filter(m => m.isFinished && m.scoreH != null && m.scoreA != null);
+      if (finishedOnly.length === 0) { setSyncMsg("ℹ️ Aucun match terminé trouvé pour le moment."); setSyncing(false); return; }
       let count = 0;
       const grp = { ...results.grp };
-      for (const r of rs) {
-        if (r.id && r.h !== undefined && r.a !== undefined && !isNaN(+r.h) && !isNaN(+r.a) && +r.h >= 0 && +r.a >= 0) {
-          grp[r.id] = { h: +r.h, a: +r.a };
+      // Match par noms d'équipes (home + away dans n'importe quel ordre)
+      GM.forEach(local => {
+        const found = finishedOnly.find(api =>
+          (api.home === local.h && api.away === local.a) ||
+          (api.home === local.a && api.away === local.h)
+        );
+        if (found) {
+          // Si l'API a inversé l'ordre, on inverse aussi le score
+          const sameOrder = found.home === local.h;
+          grp[local.id] = sameOrder ? { h: +found.scoreH, a: +found.scoreA } : { h: +found.scoreA, a: +found.scoreH };
           count++;
         }
-      }
+      });
       const updated = { ...results, grp };
       setResults(updated);
       await ss("results", updated);
       setSyncMsg(`✓ ${count} résultat${count>1?"s":""} mis à jour automatiquement !`);
     } catch(e) {
-      setSyncMsg(`⚠ Erreur : ${e.message}. Réessayez dans quelques instants.`);
+      setSyncMsg(`⚠ Erreur : ${e.message}. Réessayez.`);
     }
     setSyncing(false);
   };
 
-  // ── SYNC AUTOMATIQUE — Phase finale
+  // ── SYNC AUTOMATIQUE — Phase finale (via football-data.org)
   const syncKoResults = async () => {
-    const allKo = KO_ROUNDS.flatMap(r => (koMatches[r]||[]).map(m => `${m.id}|${m.h}|${m.a}|${r}`));
+    const allKo = KO_ROUNDS.flatMap(r => (koMatches[r]||[]).map(m => ({...m, round:r})));
     if (allKo.length === 0) { setSyncMsg("⚠ Ajoutez d'abord les matchs de phase finale manuellement."); return; }
-    setSyncing(true); setSyncMsg("🔍 Recherche des scores de phase finale…");
+    setSyncing(true); setSyncMsg("🔍 Récupération des scores phase finale…");
     try {
-      const prompt = `Tu es un assistant qui récupère les scores de matchs de football.
-Cherche sur le web les scores OFFICIELS ET DÉFINITIFS des matchs de la phase finale de la Coupe du Monde FIFA 2026.
-
-Liste des matchs (id|domicile|extérieur|tour) :
-${allKo.join('\n')}
-
-IMPORTANT : n'inclus que les matchs terminés avec un score final (score après prolongations si nécessaire, pas les tirs au but — juste le score à la fin du temps règlementaire/prolongations).
-Réponds UNIQUEMENT avec un objet JSON valide, sans markdown, sans explication :
-{"results":[{"id":"KOHui1","h":2,"a":1},...]}
-Si aucun match n'est terminé, réponds : {"results":[]}`;
-
-      const parsed = await fetchScoresFromWeb(prompt);
-      const rs = parsed.results || [];
-      if (rs.length === 0) { setSyncMsg("ℹ️ Aucun match de phase finale terminé trouvé."); setSyncing(false); return; }
+      const wcMatches = await fetchScoresFromWeb();
+      if (wcMatches.length === 0) { setSyncMsg("⚠ Impossible de récupérer les données."); setSyncing(false); return; }
+      const finishedOnly = wcMatches.filter(m => m.isFinished && m.scoreH != null && m.scoreA != null);
+      if (finishedOnly.length === 0) { setSyncMsg("ℹ️ Aucun match de phase finale terminé trouvé."); setSyncing(false); return; }
       let count = 0;
       const ko = { ...results.ko };
-      for (const r of rs) {
-        if (r.id && r.h !== undefined && r.a !== undefined && !isNaN(+r.h) && !isNaN(+r.a) && +r.h >= 0 && +r.a >= 0) {
-          ko[r.id] = { h: +r.h, a: +r.a };
+      allKo.forEach(local => {
+        const found = finishedOnly.find(api =>
+          (api.home === local.h && api.away === local.a) ||
+          (api.home === local.a && api.away === local.h)
+        );
+        if (found) {
+          const sameOrder = found.home === local.h;
+          ko[local.id] = sameOrder ? { h: +found.scoreH, a: +found.scoreA } : { h: +found.scoreA, a: +found.scoreH };
           count++;
         }
-      }
+      });
       const updated = { ...results, ko };
       setResults(updated);
       await ss("results", updated);
