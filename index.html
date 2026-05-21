@@ -434,6 +434,30 @@ const launchConfetti = () => {
 };
 
 // ── Appel API Claude avec web search pour récupérer les scores
+async function fetchScoresFromWeb(prompt) {
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 1000,
+      tools: [{ type: "web_search_20250305", name: "web_search" }],
+      messages: [{ role: "user", content: prompt }]
+    })
+  });
+  if (!response.ok) throw new Error(`API error: ${response.status}`);
+  const data = await response.json();
+  // Extraire le texte de la réponse (ignorer les blocs tool_use)
+  const text = (data.content || [])
+    .filter(b => b.type === "text")
+    .map(b => b.text)
+    .join("");
+  // Nettoyer et parser le JSON
+  const clean = text.replace(/```json|```/g, "").trim();
+  const match = clean.match(/\{[\s\S]*\}/);
+  if (!match) throw new Error("Pas de JSON dans la réponse");
+  return JSON.parse(match[0]);
+}
 
 
 // ── Calendrier officiel FIFA 2026 (heures ET = UTC-4)
