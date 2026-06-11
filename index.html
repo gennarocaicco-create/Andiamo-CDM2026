@@ -2220,7 +2220,7 @@ function App(){
     }
   }, [results, preds, koMatches, pseudo]);
 
-  // Rappel match dans 1h sans pronostic → notification LOCALE (sur cet appareil uniquement)
+  // Rappel match dans 1h sans pronostic → push UNE SEULE FOIS pour tous (via Firebase)
   const remindedRef = useRef(new Set());
   useEffect(() => {
     if (!pseudo || pseudo === "__admin") return;
@@ -2232,20 +2232,21 @@ function App(){
         if (!ko) return;
         const koDate = new Date(ko);
         if (koDate < now || koDate > in1h) return;
-        const p = preds.grp?.[m.id];
-        if (p && p.h !== "" && p.h != null) return;
         const key = "rem_" + m.id;
         if (remindedRef.current.has(key)) return;
         remindedRef.current.add(key);
-        // Notification LOCALE uniquement (pas de push à tous les autres !)
-        try {
-          if (typeof Notification !== "undefined" && Notification.permission === "granted") {
-            new Notification("⏰ Andiamo CDM 2026", {
-              body: `${m.h} vs ${m.a} dans moins d'1h ! N'oublie pas ton pronostic.`,
-              tag: key
-            });
+        // Transaction Firebase : le 1er appareil qui arrive "réserve" l'envoi
+        // → le push ne part qu'UNE seule fois pour tout le monde
+        const flagRef = DB.ref(`wc26/reminders_sent/${m.id}`);
+        flagRef.transaction(current => {
+          if (current) return; // déjà envoyé → on annule
+          return Date.now();   // on réserve
+        }, (error, committed) => {
+          if (!error && committed) {
+            // C'est nous qui avons réservé → on envoie le push à tous
+            sendPushNotification(`⏰ ${m.h} vs ${m.a} dans moins d'1h ! N'oublie pas ton pronostic. 🔒`);
           }
-        } catch(e) { console.log("local notif err", e); }
+        });
       });
     };
     check();
