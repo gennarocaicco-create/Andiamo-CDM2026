@@ -2220,7 +2220,7 @@ function App(){
     }
   }, [results, preds, koMatches, pseudo]);
 
-  // Rappel match dans 1h sans pronostic → notif push auto (déclenché 1x par match)
+  // Rappel match dans 1h sans pronostic → notification LOCALE (sur cet appareil uniquement)
   const remindedRef = useRef(new Set());
   useEffect(() => {
     if (!pseudo || pseudo === "__admin") return;
@@ -2237,7 +2237,15 @@ function App(){
         const key = "rem_" + m.id;
         if (remindedRef.current.has(key)) return;
         remindedRef.current.add(key);
-        sendPushNotification(`⏰ ${m.h} vs ${m.a} dans moins d'1h ! N'oublie pas ton pronostic.`);
+        // Notification LOCALE uniquement (pas de push à tous les autres !)
+        try {
+          if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+            new Notification("⏰ Andiamo CDM 2026", {
+              body: `${m.h} vs ${m.a} dans moins d'1h ! N'oublie pas ton pronostic.`,
+              tag: key
+            });
+          }
+        } catch(e) { console.log("local notif err", e); }
       });
     };
     check();
