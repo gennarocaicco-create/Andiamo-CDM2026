@@ -13,16 +13,21 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
+// IMPORTANT : on n'affiche une notification manuellement QUE si le payload
+// ne contient PAS de bloc "notification" (sinon le navigateur l'affiche déjà
+// automatiquement → doublon)
 messaging.onBackgroundMessage(payload => {
-  const n = payload.notification || {};
+  if (payload.notification) {
+    // Le navigateur affiche déjà cette notification automatiquement.
+    // Ne rien faire pour éviter le doublon.
+    return;
+  }
+  // Message "data-only" → on doit l'afficher nous-mêmes
   const data = payload.data || {};
-  const title = n.title || '🏆 Andiamo CDM 2026';
-  const body = n.body || data.msg || '';
-  self.registration.showNotification(title, {
-    body: body,
+  self.registration.showNotification('🏆 Andiamo CDM 2026', {
+    body: data.msg || '',
     vibrate: [200, 100, 200],
-    tag: 'andiamo-notif',
-    requireInteraction: false
+    tag: 'andiamo-notif'
   });
 });
 
