@@ -155,17 +155,40 @@ const isFinishedStatus = s => ["FINISHED","AWARDED"].includes(s);
 
 // Cache global : on appelle l'API max 1x toutes les 3 min
 let _wcMatchesCache = { ts: 0, data: [] };
+
+// L'API football-data.org bloque les appels directs depuis le navigateur (CORS).
+// On passe par un proxy CORS. On essaie plusieurs proxies au cas où l'un tombe.
+const CORS_PROXIES = [
+  url => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
+  url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+  url => `https://proxy.cors.sh/${url}`,
+];
+
+async function fetchWCRaw() {
+  const apiUrl = `${FOOTBALL_DATA_BASE}/competitions/WC/matches`;
+  // Essai 1 : appel direct (au cas où ça marche un jour)
+  for (const makeProxy of CORS_PROXIES) {
+    try {
+      const proxied = makeProxy(apiUrl);
+      const r = await fetch(proxied, {
+        headers: { "X-Auth-Token": FOOTBALL_DATA_TOKEN }
+      });
+      if (!r.ok) continue;
+      const data = await r.json();
+      if (data && data.matches) return data;
+    } catch(e) { /* on essaie le proxy suivant */ }
+  }
+  return null;
+}
+
 async function fetchWCMatches() {
   const now = Date.now();
   if (now - _wcMatchesCache.ts < 3*60*1000 && _wcMatchesCache.data.length > 0) {
     return _wcMatchesCache.data;
   }
   try {
-    const r = await fetch(`${FOOTBALL_DATA_BASE}/competitions/WC/matches`, {
-      headers: { "X-Auth-Token": FOOTBALL_DATA_TOKEN }
-    });
-    if (!r.ok) return _wcMatchesCache.data;
-    const data = await r.json();
+    const data = await fetchWCRaw();
+    if (!data) return _wcMatchesCache.data;
     const matches = (data.matches || []).map(m => ({
       home: toFR(m.homeTeam?.name || ""),
       away: toFR(m.awayTeam?.name || ""),
