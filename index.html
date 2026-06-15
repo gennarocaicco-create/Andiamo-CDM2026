@@ -1738,7 +1738,7 @@ function AdminPage({results,settings,koMatches,players,saveResult,deleteResult,s
 // ════════════════════════════════════════════
 
 function HistoryGraph({history, myPseudo, highlightPseudo}){
-  const[zoom,setZoom]=useState(1);
+  const[expanded,setExpanded]=useState(false);
   if (!history || history.length < 2) {
     return(
       <div style={{background:T.card,borderRadius:12,padding:24,textAlign:"center",border:`1px solid ${T.border}`,color:T.muted,fontSize:13}}>
@@ -1751,7 +1751,6 @@ function HistoryGraph({history, myPseudo, highlightPseudo}){
   const players = Array.from(new Set(history.flatMap(s => s.board.map(p => p.pseudo))));
   const maxPos = players.length;
   const colors = ["#fbbf24","#22c55e","#60a5fa","#f87171","#a78bfa","#f97316","#ec4899","#14b8a6","#84cc16","#eab308"];
-  // Un participant est mis en évidence soit s'il est sélectionné, soit (à défaut) si c'est moi
   const focusPseudo = highlightPseudo || myPseudo;
   const playerLines = players.map((pseudo, idx) => {
     const points = history.map((snap, i) => {
@@ -1763,59 +1762,75 @@ function HistoryGraph({history, myPseudo, highlightPseudo}){
     });
     return {pseudo, points, color: colors[idx % colors.length]};
   });
-  // La ligne en évidence se dessine en dernier (au-dessus des autres)
   const sortedLines = [...playerLines].sort((a,b) => (a.pseudo===focusPseudo?1:0) - (b.pseudo===focusPseudo?1:0));
+
+  // Le SVG du graphique (réutilisé en normal + en plein écran)
+  const renderSvg = (big) => (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{width:"100%",height:big?"auto":"auto",display:"block"}}>
+      {[1,Math.ceil(maxPos/2),maxPos].filter((v,i,a)=>a.indexOf(v)===i).map(pos => {
+        const y = padT + ((pos-1)/(Math.max(1,maxPos-1))) * innerH;
+        return(
+          <g key={pos}>
+            <line x1={padL} y1={y} x2={W-padR} y2={y} stroke="#1c2a40" strokeDasharray="2,2"/>
+            <text x={padL-5} y={y+3} fill="#64748b" fontSize="9" textAnchor="end">{pos}</text>
+          </g>
+        );
+      })}
+      {history.map((snap, i) => {
+        const x = padL + (i/(history.length-1)) * innerW;
+        return <text key={i} x={x} y={H-8} fill="#64748b" fontSize="8" textAnchor="middle">J{i+1}</text>;
+      })}
+      {sortedLines.map(line => {
+        const isFocus = line.pseudo === focusPseudo;
+        const dimmed = focusPseudo && !isFocus;
+        const path = line.points.map((p,i) => `${i===0?"M":"L"}${p.x},${p.y}`).join(" ");
+        const col = isFocus ? "#fbbf24" : line.color;
+        return(
+          <g key={line.pseudo}>
+            <path d={path} stroke={col} strokeWidth={isFocus?3:1.2} fill="none" opacity={dimmed?0.25:isFocus?1:0.6}/>
+            {line.points.map((p,i) => (
+              <circle key={i} cx={p.x} cy={p.y} r={isFocus?3.5:2} fill={col} opacity={dimmed?0.25:isFocus?1:0.6}/>
+            ))}
+            <text x={W-padR+2} y={line.points[line.points.length-1].y+3} fill={col} fontSize={isFocus?10:8} fontWeight={isFocus?700:400} opacity={dimmed?0.3:isFocus?1:0.7}>
+              {line.pseudo.substring(0,8)}
+            </text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+
   return(
-    <div style={{background:T.card,borderRadius:12,padding:14,border:`1px solid ${T.border}`}}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-        <div style={{fontSize:12,fontWeight:600,color:T.muted,textTransform:"uppercase",letterSpacing:1}}>📈 Évolution du classement</div>
-        <div style={{display:"flex",gap:6,alignItems:"center"}}>
-          <button onClick={()=>setZoom(z=>Math.max(1,z-0.5))} disabled={zoom<=1} style={{background:T.card2,border:`1px solid ${T.border}`,borderRadius:6,width:28,height:28,color:zoom<=1?"#2d3a50":T.text,fontSize:18,cursor:zoom<=1?"not-allowed":"pointer",lineHeight:1,padding:0}}>−</button>
-          <span style={{fontSize:11,color:T.muted,minWidth:32,textAlign:"center"}}>{Math.round(zoom*100)}%</span>
-          <button onClick={()=>setZoom(z=>Math.min(4,z+0.5))} disabled={zoom>=4} style={{background:T.card2,border:`1px solid ${T.border}`,borderRadius:6,width:28,height:28,color:zoom>=4?"#2d3a50":T.text,fontSize:18,cursor:zoom>=4?"not-allowed":"pointer",lineHeight:1,padding:0}}>+</button>
+    <>
+      {/* Vue normale — cliquable pour agrandir */}
+      <div onClick={()=>setExpanded(true)} style={{background:T.card,borderRadius:12,padding:14,border:`1px solid ${T.border}`,cursor:"pointer"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+          <div style={{fontSize:12,fontWeight:600,color:T.muted,textTransform:"uppercase",letterSpacing:1}}>📈 Évolution du classement</div>
+          <span style={{fontSize:11,color:T.blue,fontWeight:600}}>⤢ Agrandir</span>
         </div>
+        {focusPseudo && (
+          <div style={{fontSize:11,color:T.gold,marginBottom:6,fontWeight:600}}>🔆 {focusPseudo}</div>
+        )}
+        {renderSvg(false)}
       </div>
-      {focusPseudo && (
-        <div style={{fontSize:11,color:T.gold,marginBottom:6,fontWeight:600}}>
-          🔆 Ligne mise en évidence : {focusPseudo}
+
+      {/* Vue plein écran (overlay en haut, ne masque pas les participants) */}
+      {expanded && (
+        <div onClick={()=>setExpanded(false)} style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(3,6,12,0.92)",zIndex:200,display:"flex",flexDirection:"column",padding:16}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:T.card,borderRadius:14,padding:16,border:`1px solid ${T.gold}66`,maxWidth:900,width:"100%",margin:"0 auto",maxHeight:"75vh",overflow:"auto"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+              <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:20,fontWeight:800,color:T.gold}}>📈 Évolution du classement</div>
+              <button onClick={()=>setExpanded(false)} style={{background:T.card2,border:`1px solid ${T.border}`,borderRadius:8,padding:"6px 14px",color:T.text,fontSize:14,cursor:"pointer",fontWeight:600}}>✕ Fermer</button>
+            </div>
+            {focusPseudo && (
+              <div style={{fontSize:13,color:T.gold,marginBottom:10,fontWeight:600}}>🔆 Ligne mise en évidence : {focusPseudo}</div>
+            )}
+            <div style={{transform:"scale(1)"}}>{renderSvg(true)}</div>
+            <div style={{fontSize:11,color:T.muted,marginTop:10,textAlign:"center"}}>Position 1 = en haut · Touchez un joueur dans le classement pour suivre sa courbe</div>
+          </div>
         </div>
       )}
-      <div className="wcs" style={{overflowX:zoom>1?"auto":"hidden",overflowY:"hidden"}}>
-        <svg viewBox={`0 0 ${W} ${H}`} style={{width:`${zoom*100}%`,height:"auto",minWidth:"100%",display:"block"}}>
-          {[1,Math.ceil(maxPos/2),maxPos].filter((v,i,a)=>a.indexOf(v)===i).map(pos => {
-            const y = padT + ((pos-1)/(Math.max(1,maxPos-1))) * innerH;
-            return(
-              <g key={pos}>
-                <line x1={padL} y1={y} x2={W-padR} y2={y} stroke="#1c2a40" strokeDasharray="2,2"/>
-                <text x={padL-5} y={y+3} fill="#64748b" fontSize="9" textAnchor="end">{pos}</text>
-              </g>
-            );
-          })}
-          {history.map((snap, i) => {
-            const x = padL + (i/(history.length-1)) * innerW;
-            return <text key={i} x={x} y={H-8} fill="#64748b" fontSize="8" textAnchor="middle">J{i+1}</text>;
-          })}
-          {sortedLines.map(line => {
-            const isFocus = line.pseudo === focusPseudo;
-            const dimmed = focusPseudo && !isFocus;
-            const path = line.points.map((p,i) => `${i===0?"M":"L"}${p.x},${p.y}`).join(" ");
-            const col = isFocus ? "#fbbf24" : line.color;
-            return(
-              <g key={line.pseudo}>
-                <path d={path} stroke={col} strokeWidth={isFocus?3:1.2} fill="none" opacity={dimmed?0.25:isFocus?1:0.6}/>
-                {line.points.map((p,i) => (
-                  <circle key={i} cx={p.x} cy={p.y} r={isFocus?3.5:2} fill={col} opacity={dimmed?0.25:isFocus?1:0.6}/>
-                ))}
-                <text x={W-padR+2} y={line.points[line.points.length-1].y+3} fill={col} fontSize={isFocus?10:8} fontWeight={isFocus?700:400} opacity={dimmed?0.3:isFocus?1:0.7}>
-                  {line.pseudo.substring(0,8)}
-                </text>
-              </g>
-            );
-          })}
-        </svg>
-      </div>
-      <div style={{fontSize:10,color:T.muted,marginTop:6,textAlign:"center"}}>Position 1 = en haut · Touchez un joueur dans le classement pour suivre sa courbe · Utilisez +/− pour zoomer</div>
-    </div>
+    </>
   );
 }
 
