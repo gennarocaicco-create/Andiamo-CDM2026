@@ -208,6 +208,69 @@ async function fetchWCMatches() {
   } catch(e) { console.log("WC fetch err:", e); return _wcMatchesCache.data; }
 }
 
+// ── Meilleurs buteurs (scorers) via football-data.org
+let _wcScorersCache = { ts: 0, data: [] };
+async function fetchWCScorersRaw() {
+  const apiUrl = `${FOOTBALL_DATA_BASE}/competitions/WC/scorers?limit=30`;
+  for (const makeProxy of CORS_PROXIES) {
+    try {
+      const proxied = makeProxy(apiUrl);
+      const r = await fetch(proxied, { headers: { "X-Auth-Token": FOOTBALL_DATA_TOKEN } });
+      if (!r.ok) continue;
+      const data = await r.json();
+      if (data && data.scorers) return data;
+    } catch(e) { /* proxy suivant */ }
+  }
+  return null;
+}
+
+async function fetchWCScorers() {
+  const now = Date.now();
+  if (now - _wcScorersCache.ts < 3*60*1000 && _wcScorersCache.data.length > 0) {
+    return _wcScorersCache.data;
+  }
+  try {
+    const data = await fetchWCScorersRaw();
+    if (!data) return _wcScorersCache.data;
+    const scorers = (data.scorers || []).map(s => ({
+      name: s.player?.name || "",
+      nationality: s.player?.nationality || "",
+      team: toFR(s.team?.name || ""),
+      goals: s.goals ?? 0,
+      assists: s.assists ?? null,
+      penalties: s.penalties ?? null
+    })).filter(s => s.name && s.goals > 0);
+    _wcScorersCache = { ts: now, data: scorers };
+    return scorers;
+  } catch(e) { console.log("WC scorers err:", e); return _wcScorersCache.data; }
+}
+
+// Hook : meilleurs buteurs rafraîchis toutes les 3 min
+function useScorers(active) {
+  const [scorers, setScorers] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [lastUpdate, setLastUpdate] = useState(null);
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    _wcScorersCache.ts = 0; // force refresh manuel
+    const data = await fetchWCScorers();
+    if (data.length > 0) { setScorers(data); setLastUpdate(new Date()); }
+    setLoading(false);
+  }, []);
+  useEffect(() => {
+    if (!active) return;
+    let stop = false;
+    const run = async () => {
+      const data = await fetchWCScorers();
+      if (!stop && data.length > 0) { setScorers(data); setLastUpdate(new Date()); }
+    };
+    run();
+    const i = setInterval(run, 3*60*1000);
+    return () => { stop = true; clearInterval(i); };
+  }, [active]);
+  return { scorers, loading, lastUpdate, refresh };
+}
+
 // Hook : scores live (rafraîchis toutes les 3 min — cache global de toute façon)
 function useLiveScores(isAdmin=false) {
   const [liveData, setLiveData] = useState([]);
@@ -2061,6 +2124,63 @@ function FinalRecap({results,koMatches,leaderboard,history,settings}){
   );
 }
 
+function ScorersPage(){
+  const { scorers, loading, lastUpdate, refresh } = useScorers(true);
+  return(
+    <div style={{paddingTop:20}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+        <PageTitle sub="Coupe du Monde 2026 — mise à jour automatique">⚽ MEILLEURS BUTEURS</PageTitle>
+        <button onClick={refresh} disabled={loading} style={{background:T.card2,color:T.muted,border:`1px solid ${T.border}`,borderRadius:8,padding:"8px 14px",fontFamily:"Inter,sans-serif",fontSize:13,cursor:loading?"not-allowed":"pointer"}}>
+          <span className={loading?"spin":""} style={{display:"inline-block"}}>🔄</span> {loading?"":"Actualiser"}
+        </button>
+      </div>
+
+      {lastUpdate && (
+        <div style={{fontSize:11,color:T.muted,marginBottom:12,textAlign:"right"}}>
+          Dernière mise à jour : {lastUpdate.toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"})}
+        </div>
+      )}
+
+      {scorers.length===0 ? (
+        <div style={{background:T.card,borderRadius:14,padding:40,textAlign:"center",border:`1px solid ${T.border}`}}>
+          <div style={{fontSize:40,marginBottom:12}}>⚽</div>
+          <div style={{color:T.muted,fontSize:14}}>{loading ? "Chargement des buteurs…" : "Les buteurs apparaîtront après les premiers matchs."}</div>
+        </div>
+      ) : (
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          {scorers.map((s,i) => {
+            const medals = ["🥇","🥈","🥉"];
+            const isTop = i < 3;
+            return(
+              <div key={s.name+i} style={{background:i===0?"linear-gradient(90deg,#1a1300 0%,#10192b 100%)":T.card,borderRadius:12,padding:"12px 16px",border:`1px solid ${i===0?T.gold:T.border}`,display:"flex",alignItems:"center",gap:12}}>
+                <div style={{width:32,textAlign:"center",fontSize:isTop?22:16,fontWeight:700,color:T.muted,fontFamily:"Inter,sans-serif"}}>
+                  {isTop ? medals[i] : i+1}
+                </div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontWeight:600,fontSize:15,color:i===0?T.gold:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                    {s.name}
+                  </div>
+                  <div style={{fontSize:12,color:T.muted,marginTop:2}}>
+                    {F[s.team]||""} {s.team}
+                    {s.assists != null && s.assists > 0 ? ` · ${s.assists} passe${s.assists>1?"s":""} D.` : ""}
+                  </div>
+                </div>
+                <div style={{display:"flex",alignItems:"baseline",gap:4}}>
+                  <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:30,fontWeight:800,color:i===0?T.gold:T.text,lineHeight:1}}>{s.goals}</span>
+                  <span style={{fontSize:12,color:T.muted}}>but{s.goals>1?"s":""}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      <div style={{marginTop:14,padding:"10px 14px",background:T.card,borderRadius:8,fontSize:12,color:T.muted,border:`1px solid ${T.border}`,textAlign:"center"}}>
+        📊 Classement officiel des buteurs, actualisé automatiquement après chaque match.
+      </div>
+    </div>
+  );
+}
+
 // ════════════════════════════════════════════
 // APP PRINCIPALE
 // ════════════════════════════════════════════
@@ -2328,6 +2448,7 @@ function App(){
     {id:"leaderboard",icon:"📊",label:"Classement"},
     {id:"knockout",icon:"🏆",label:"Finale"},
     {id:"bonus",icon:"⭐",label:"Bonus"},
+    {id:"scorers",icon:"⚽",label:"Buteurs"},
     {id:"profile",icon:"👤",label:"Profil"},
     {id:"notifs",icon:"🔔",label:"Notifs",badge:unreadCount},
   ];
@@ -2395,6 +2516,7 @@ function App(){
         {page==="bonus"&&<BonusPage preds={preds} settings={settings} onChangeBonus={onChangeBonus}/>}
         {page==="knockout"&&<KoPage preds={preds} results={results} koMatches={koMatches} settings={settings} activeRound={activeRound} setActiveRound={setActiveRound} onChangePred={onChangePred} schedule={schedule} liveData={liveData}/>}
         {page==="leaderboard"&&<LeaderboardPage leaderboard={leaderboard} prevLeaderboard={prevLeaderboard} loading={lbLoading} myPseudo={pseudo} onRefresh={loadLeaderboard} results={results} schedule={schedule} koMatches={koMatches} history={history}/>}
+        {page==="scorers"&&<ScorersPage/>}
         {page==="profile"&&<ProfilePage pseudo={pseudo} preds={preds} results={results} koMatches={koMatches} settings={settings} leaderboard={leaderboard} history={history}/>}
         {page==="notifs"&&(
           <div style={{paddingTop:20}}>
