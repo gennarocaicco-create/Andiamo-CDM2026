@@ -887,7 +887,7 @@ function LeaderboardPage({leaderboard,prevLeaderboard,loading,myPseudo,onRefresh
       {/* Graphique d'évolution */}
       {history && history.length >= 2 && (
         <div style={{marginBottom:14}}>
-          <HistoryGraph history={history} myPseudo={myPseudo}/>
+          <HistoryGraph history={history} myPseudo={myPseudo} highlightPseudo={expanded}/>
         </div>
       )}
 
@@ -905,8 +905,8 @@ function LeaderboardPage({leaderboard,prevLeaderboard,loading,myPseudo,onRefresh
             return(
               <div key={p.pseudo}>
                 <div
-                  onClick={()=>hasLocked&&setExpanded(isExp?null:p.pseudo)}
-                  style={{background:isFirst?"linear-gradient(90deg,#1a1300 0%,#10192b 100%)":isMe?"#101d30":T.card,borderRadius:isExp?"14px 14px 0 0":14,padding:"14px 18px",border:`1px solid ${isFirst?T.gold:isMe?T.blue+"66":T.border}`,display:"flex",alignItems:"center",gap:12,cursor:hasLocked?"pointer":"default",transition:"border-radius 0.2s"}}>
+                  onClick={()=>setExpanded(isExp?null:p.pseudo)}
+                  style={{background:isFirst?"linear-gradient(90deg,#1a1300 0%,#10192b 100%)":isMe?"#101d30":(isExp?"#15233a":T.card),borderRadius:isExp?"14px 14px 0 0":14,padding:"14px 18px",border:`1px solid ${isExp?T.gold:isFirst?T.gold:isMe?T.blue+"66":T.border}`,display:"flex",alignItems:"center",gap:12,cursor:"pointer",transition:"border-radius 0.2s"}}>
                   <div style={{width:36,textAlign:"center",fontSize:22}}>{i<3?medals[i]:<span style={{color:T.muted,fontWeight:700,fontFamily:"Inter,sans-serif"}}>{i+1}</span>}</div>
                   {arrow&&<div style={{fontSize:12,fontWeight:700,color:arrowColor,flexShrink:0,width:16,textAlign:"center"}}>{arrow}</div>}
                   <div style={{flex:1,minWidth:0}}>
@@ -923,7 +923,7 @@ function LeaderboardPage({leaderboard,prevLeaderboard,loading,myPseudo,onRefresh
                     <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:34,fontWeight:800,color:isFirst?T.gold:T.text,lineHeight:1}}>
                       {p.score.total}<span style={{fontSize:14,fontFamily:"Inter,sans-serif",color:T.muted,fontWeight:400}}> pts</span>
                     </div>
-                    {hasLocked&&<span style={{color:T.muted,fontSize:16}}>{isExp?"▲":"▼"}</span>}
+                    <span style={{color:isExp?T.gold:T.muted,fontSize:16}}>{isExp?"▲":"▼"}</span>
                   </div>
                 </div>
 
@@ -1031,6 +1031,12 @@ function LeaderboardPage({leaderboard,prevLeaderboard,loading,myPseudo,onRefresh
                             flag1={F[m.h]||"🏳"} flag2={F[m.a]||"🏳"}/>
                         ))}
                       </>
+                    )}
+                    {!hasLocked&&(
+                      <div style={{fontSize:12,color:T.gold,textAlign:"center",padding:"4px 0"}}>
+                        🔆 Courbe de {p.pseudo} mise en évidence dans le graphique ci-dessus.
+                        <div style={{fontSize:11,color:T.muted,marginTop:4}}>Les pronostics détaillés seront visibles dès qu'un match sera lancé.</div>
+                      </div>
                     )}
                   </div>
                 )}
@@ -1731,7 +1737,8 @@ function AdminPage({results,settings,koMatches,players,saveResult,deleteResult,s
 // COMPOSANTS BONUS — Profile, History, Today, Final
 // ════════════════════════════════════════════
 
-function HistoryGraph({history, myPseudo}){
+function HistoryGraph({history, myPseudo, highlightPseudo}){
+  const[zoom,setZoom]=useState(1);
   if (!history || history.length < 2) {
     return(
       <div style={{background:T.card,borderRadius:12,padding:24,textAlign:"center",border:`1px solid ${T.border}`,color:T.muted,fontSize:13}}>
@@ -1744,6 +1751,8 @@ function HistoryGraph({history, myPseudo}){
   const players = Array.from(new Set(history.flatMap(s => s.board.map(p => p.pseudo))));
   const maxPos = players.length;
   const colors = ["#fbbf24","#22c55e","#60a5fa","#f87171","#a78bfa","#f97316","#ec4899","#14b8a6","#84cc16","#eab308"];
+  // Un participant est mis en évidence soit s'il est sélectionné, soit (à défaut) si c'est moi
+  const focusPseudo = highlightPseudo || myPseudo;
   const playerLines = players.map((pseudo, idx) => {
     const points = history.map((snap, i) => {
       const found = snap.board.findIndex(p => p.pseudo === pseudo);
@@ -1752,42 +1761,60 @@ function HistoryGraph({history, myPseudo}){
       const y = padT + ((pos-1)/(Math.max(1,maxPos-1))) * innerH;
       return {x, y};
     });
-    return {pseudo, points, color: pseudo === myPseudo ? "#fbbf24" : colors[idx % colors.length]};
+    return {pseudo, points, color: colors[idx % colors.length]};
   });
+  // La ligne en évidence se dessine en dernier (au-dessus des autres)
+  const sortedLines = [...playerLines].sort((a,b) => (a.pseudo===focusPseudo?1:0) - (b.pseudo===focusPseudo?1:0));
   return(
-    <div style={{background:T.card,borderRadius:12,padding:14,border:`1px solid ${T.border}`,overflow:"auto"}}>
-      <div style={{fontSize:12,fontWeight:600,color:T.muted,marginBottom:8,textTransform:"uppercase",letterSpacing:1}}>📈 Évolution du classement</div>
-      <svg viewBox={`0 0 ${W} ${H}`} style={{width:"100%",height:"auto",maxWidth:500}}>
-        {[1,Math.ceil(maxPos/2),maxPos].filter((v,i,a)=>a.indexOf(v)===i).map(pos => {
-          const y = padT + ((pos-1)/(Math.max(1,maxPos-1))) * innerH;
-          return(
-            <g key={pos}>
-              <line x1={padL} y1={y} x2={W-padR} y2={y} stroke="#1c2a40" strokeDasharray="2,2"/>
-              <text x={padL-5} y={y+3} fill="#64748b" fontSize="9" textAnchor="end">{pos}</text>
-            </g>
-          );
-        })}
-        {history.map((snap, i) => {
-          const x = padL + (i/(history.length-1)) * innerW;
-          return <text key={i} x={x} y={H-8} fill="#64748b" fontSize="8" textAnchor="middle">J{i+1}</text>;
-        })}
-        {playerLines.map(line => {
-          const isMe = line.pseudo === myPseudo;
-          const path = line.points.map((p,i) => `${i===0?"M":"L"}${p.x},${p.y}`).join(" ");
-          return(
-            <g key={line.pseudo}>
-              <path d={path} stroke={line.color} strokeWidth={isMe?2.5:1.2} fill="none" opacity={isMe?1:0.5}/>
-              {line.points.map((p,i) => (
-                <circle key={i} cx={p.x} cy={p.y} r={isMe?3:2} fill={line.color} opacity={isMe?1:0.5}/>
-              ))}
-              <text x={W-padR+2} y={line.points[line.points.length-1].y+3} fill={line.color} fontSize={isMe?10:8} fontWeight={isMe?700:400} opacity={isMe?1:0.7}>
-                {line.pseudo.substring(0,8)}
-              </text>
-            </g>
-          );
-        })}
-      </svg>
-      <div style={{fontSize:10,color:T.muted,marginTop:6,textAlign:"center"}}>Position 1 = en haut · Ta ligne en or doré</div>
+    <div style={{background:T.card,borderRadius:12,padding:14,border:`1px solid ${T.border}`}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+        <div style={{fontSize:12,fontWeight:600,color:T.muted,textTransform:"uppercase",letterSpacing:1}}>📈 Évolution du classement</div>
+        <div style={{display:"flex",gap:6,alignItems:"center"}}>
+          <button onClick={()=>setZoom(z=>Math.max(1,z-0.5))} disabled={zoom<=1} style={{background:T.card2,border:`1px solid ${T.border}`,borderRadius:6,width:28,height:28,color:zoom<=1?"#2d3a50":T.text,fontSize:18,cursor:zoom<=1?"not-allowed":"pointer",lineHeight:1,padding:0}}>−</button>
+          <span style={{fontSize:11,color:T.muted,minWidth:32,textAlign:"center"}}>{Math.round(zoom*100)}%</span>
+          <button onClick={()=>setZoom(z=>Math.min(4,z+0.5))} disabled={zoom>=4} style={{background:T.card2,border:`1px solid ${T.border}`,borderRadius:6,width:28,height:28,color:zoom>=4?"#2d3a50":T.text,fontSize:18,cursor:zoom>=4?"not-allowed":"pointer",lineHeight:1,padding:0}}>+</button>
+        </div>
+      </div>
+      {focusPseudo && (
+        <div style={{fontSize:11,color:T.gold,marginBottom:6,fontWeight:600}}>
+          🔆 Ligne mise en évidence : {focusPseudo}
+        </div>
+      )}
+      <div className="wcs" style={{overflowX:zoom>1?"auto":"hidden",overflowY:"hidden"}}>
+        <svg viewBox={`0 0 ${W} ${H}`} style={{width:`${zoom*100}%`,height:"auto",minWidth:"100%",display:"block"}}>
+          {[1,Math.ceil(maxPos/2),maxPos].filter((v,i,a)=>a.indexOf(v)===i).map(pos => {
+            const y = padT + ((pos-1)/(Math.max(1,maxPos-1))) * innerH;
+            return(
+              <g key={pos}>
+                <line x1={padL} y1={y} x2={W-padR} y2={y} stroke="#1c2a40" strokeDasharray="2,2"/>
+                <text x={padL-5} y={y+3} fill="#64748b" fontSize="9" textAnchor="end">{pos}</text>
+              </g>
+            );
+          })}
+          {history.map((snap, i) => {
+            const x = padL + (i/(history.length-1)) * innerW;
+            return <text key={i} x={x} y={H-8} fill="#64748b" fontSize="8" textAnchor="middle">J{i+1}</text>;
+          })}
+          {sortedLines.map(line => {
+            const isFocus = line.pseudo === focusPseudo;
+            const dimmed = focusPseudo && !isFocus;
+            const path = line.points.map((p,i) => `${i===0?"M":"L"}${p.x},${p.y}`).join(" ");
+            const col = isFocus ? "#fbbf24" : line.color;
+            return(
+              <g key={line.pseudo}>
+                <path d={path} stroke={col} strokeWidth={isFocus?3:1.2} fill="none" opacity={dimmed?0.25:isFocus?1:0.6}/>
+                {line.points.map((p,i) => (
+                  <circle key={i} cx={p.x} cy={p.y} r={isFocus?3.5:2} fill={col} opacity={dimmed?0.25:isFocus?1:0.6}/>
+                ))}
+                <text x={W-padR+2} y={line.points[line.points.length-1].y+3} fill={col} fontSize={isFocus?10:8} fontWeight={isFocus?700:400} opacity={dimmed?0.3:isFocus?1:0.7}>
+                  {line.pseudo.substring(0,8)}
+                </text>
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+      <div style={{fontSize:10,color:T.muted,marginTop:6,textAlign:"center"}}>Position 1 = en haut · Touchez un joueur dans le classement pour suivre sa courbe · Utilisez +/− pour zoomer</div>
     </div>
   );
 }
