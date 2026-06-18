@@ -290,17 +290,31 @@ function useLiveScores(isAdmin=false) {
 
 // Trouver le score live d'un match par ses équipes
 function getLiveMatch(liveData, home, away) {
-  return liveData.find(m =>
-    (m.home === home && m.away === away) ||
-    (m.home === away && m.away === home)
-  ) || null;
+  const m = liveData.find(x =>
+    (x.home === home && x.away === away) ||
+    (x.home === away && x.away === home)
+  );
+  if (!m) return null;
+  // L'API peut renvoyer les équipes dans l'ordre officiel inverse de l'ordre stocké.
+  // On normalise les scores sur l'ordre de l'app (scoreH = équipe "h" de l'app)
+  // pour que le calcul des points reste correct, et on garde l'info de l'ordre officiel.
+  const reversed = m.home === away && m.away === home;
+  return {
+    ...m,
+    scoreH: reversed ? m.scoreA : m.scoreH,
+    scoreA: reversed ? m.scoreH : m.scoreA,
+    officialReversed: reversed,   // true = l'ordre officiel FIFA est inversé vs l'app
+  };
 }
 
 // Badge live affiché sur la carte match
 const LiveBadge = ({ live, pred }) => {
   if (!live) return null;
-  const h = live.scoreH ?? "—";
-  const a = live.scoreA ?? "—";
+  // Affichage dans l'ordre officiel FIFA. Les scores sont stockés en ordre app
+  // (scoreH = équipe h de l'app) ; si l'ordre officiel est inversé, on échange l'affichage.
+  const flip = live.officialReversed;
+  const h = (flip ? live.scoreA : live.scoreH) ?? "—";
+  const a = (flip ? live.scoreH : live.scoreA) ?? "—";
   const hasPred = pred?.h !== "" && pred?.h != null && pred?.a !== "" && pred?.a != null;
   const p = hasPred && live.isFinished ? matchPts(pred, {h: live.scoreH, a: live.scoreA}) : null;
   const pColor = p === 2 ? T.green : p === 1 ? T.blue : p === 0 ? T.red : T.muted;
@@ -632,6 +646,15 @@ const MatchCard=({match,pred,result,onChangePred,kickoff,live})=>{
   const locked=isMatchLocked(kickoff);
   const bc=p===2?T.green:p===1?T.blue:p===0?T.red:locked?"#f97316":T.border;
   const isLiveNow=live?.isLive;
+  // Affichage dans l'ordre officiel FIFA. Le stockage (pred.h/pred.a) ne change pas :
+  // on inverse seulement l'affichage des équipes ET le câblage des champs de saisie.
+  const flip = live?.officialReversed || false;
+  const leftTeam = flip ? match.a : match.h;
+  const rightTeam = flip ? match.h : match.a;
+  const leftField = flip ? "a" : "h";
+  const rightField = flip ? "h" : "a";
+  const leftVal = flip ? pred?.a : pred?.h;
+  const rightVal = flip ? pred?.h : pred?.a;
   return(
     <div style={{background:isLiveNow?"#050f05":locked?"#100a00":T.card,borderRadius:12,padding:"10px 14px",border:`1px solid ${isLiveNow?"#22c55e55":locked?"#f9731644":p!==null?bc+"55":T.border}`,marginBottom:8,opacity:locked&&!isLiveNow?0.85:1}}>
       {/* Date / heure */}
@@ -652,20 +675,20 @@ const MatchCard=({match,pred,result,onChangePred,kickoff,live})=>{
           </div>
         );
       })()}
-      {/* Équipes + scores pronostic */}
+      {/* Équipes + scores pronostic (ordre officiel FIFA) */}
       <div style={{display:"flex",alignItems:"center",gap:8}}>
         <div style={{flex:1,textAlign:"right"}}>
-          <div style={{fontSize:11,color:T.muted,marginBottom:2}}>{F[match.h]||"🏳"}</div>
-          <div style={{fontSize:13,fontWeight:600,color:T.text,lineHeight:1.2}}>{match.h}</div>
+          <div style={{fontSize:11,color:T.muted,marginBottom:2}}>{F[leftTeam]||"🏳"}</div>
+          <div style={{fontSize:13,fontWeight:600,color:T.text,lineHeight:1.2}}>{leftTeam}</div>
         </div>
         <div style={{display:"flex",alignItems:"center",gap:5,flexShrink:0}}>
-          <SInput value={pred?.h??""} onChange={locked?()=>{}:v=>onChangePred("h",v)} bc={bc}/>
+          <SInput value={leftVal??""} onChange={locked?()=>{}:v=>onChangePred(leftField,v)} bc={bc}/>
           <span style={{color:T.muted,fontWeight:700,fontSize:14}}>—</span>
-          <SInput value={pred?.a??""} onChange={locked?()=>{}:v=>onChangePred("a",v)} bc={bc}/>
+          <SInput value={rightVal??""} onChange={locked?()=>{}:v=>onChangePred(rightField,v)} bc={bc}/>
         </div>
         <div style={{flex:1,textAlign:"left"}}>
-          <div style={{fontSize:11,color:T.muted,marginBottom:2}}>{F[match.a]||"🏳"}</div>
-          <div style={{fontSize:13,fontWeight:600,color:T.text,lineHeight:1.2}}>{match.a}</div>
+          <div style={{fontSize:11,color:T.muted,marginBottom:2}}>{F[rightTeam]||"🏳"}</div>
+          <div style={{fontSize:13,fontWeight:600,color:T.text,lineHeight:1.2}}>{rightTeam}</div>
         </div>
         <div style={{width:28,textAlign:"center",fontWeight:700,fontSize:12,flexShrink:0,color:p===2?T.green:p===1?T.blue:p===0?T.red:locked?"#f97316":T.muted}}>
           {p===null?"—":p===2?"✓2":p===1?"+1":"✗0"}
@@ -674,7 +697,7 @@ const MatchCard=({match,pred,result,onChangePred,kickoff,live})=>{
       {/* Score live + prono */}
       {live&&(live.isLive||live.isFinished)&&<LiveBadge live={live} pred={pred}/>}
       {/* Score officiel stocké */}
-      {result&&!live?.isLive&&<div style={{textAlign:"center",marginTop:6,fontSize:11,color:T.muted}}>Résultat officiel : {result.h} – {result.a}</div>}
+      {result&&!live?.isLive&&<div style={{textAlign:"center",marginTop:6,fontSize:11,color:T.muted}}>Résultat officiel : {flip?result.a:result.h} – {flip?result.h:result.a}</div>}
     </div>
   );
 };
