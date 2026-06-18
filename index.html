@@ -913,23 +913,37 @@ function LeaderboardPage({leaderboard,prevLeaderboard,loading,myPseudo,onRefresh
     return "same";
   };
 
-  // Matchs verrouillés uniquement (groupe + KO)
-  const lockedGrpMatches=GM.filter(m=>isMatchLocked(schedule?.[m.id]));
-  const lockedKoMatches=KO_ROUNDS.flatMap(r=>(koMatches?.[r]||[]).filter(m=>isMatchLocked(schedule?.[m.id])));
+  // Matchs verrouillés uniquement (groupe + KO), triés par ordre chronologique (date de match)
+  const byDate=(a,b)=>{
+    const da=schedule?.[a.id]?new Date(schedule[a.id]).getTime():Infinity;
+    const db=schedule?.[b.id]?new Date(schedule[b.id]).getTime():Infinity;
+    return da-db;
+  };
+  const lockedGrpMatches=GM.filter(m=>isMatchLocked(schedule?.[m.id])).sort(byDate);
+  const lockedKoMatches=KO_ROUNDS.flatMap(r=>(koMatches?.[r]||[]).filter(m=>isMatchLocked(schedule?.[m.id]))).sort(byDate);
   const hasLocked=lockedGrpMatches.length>0||lockedKoMatches.length>0;
 
-  const PredRow=({label,predH,predA,resH,resA,flag1,flag2})=>{
+  const fmtMatchDate=(iso)=>{
+    if(!iso) return "";
+    const d=new Date(iso);
+    if(isNaN(d)) return "";
+    return d.toLocaleDateString("fr-FR",{day:"2-digit",month:"2-digit"})+" "+d.toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"});
+  };
+  const PredRow=({label,predH,predA,resH,resA,flag1,flag2,dateLabel})=>{
     const p=predH!=null&&predA!=null&&resH!=null?matchPts({h:predH,a:predA},{h:resH,a:resA}):null;
     const hasPred=predH!=null&&predA!=null&&predH!==""&&predA!=="";
     const color=p===2?T.green:p===1?T.blue:p===0?T.red:T.muted;
     return(
-      <div style={{display:"flex",alignItems:"center",gap:6,padding:"4px 0",borderBottom:`1px solid ${T.border}22`}}>
-        <div style={{flex:1,fontSize:11,textAlign:"right",color:T.muted,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{flag1} {label.split(" vs ")[0]}</div>
-        <div style={{fontSize:12,fontWeight:700,color:hasPred?color:T.muted,background:hasPred?color+"22":"transparent",borderRadius:6,padding:"2px 8px",flexShrink:0,minWidth:44,textAlign:"center"}}>
-          {hasPred?`${predH}–${predA}`:"—"}
+      <div style={{padding:"4px 0",borderBottom:`1px solid ${T.border}22`}}>
+        {dateLabel&&<div style={{fontSize:9,color:T.muted,textAlign:"center",marginBottom:2,letterSpacing:0.5}}>📅 {dateLabel}</div>}
+        <div style={{display:"flex",alignItems:"center",gap:6}}>
+          <div style={{flex:1,fontSize:11,textAlign:"right",color:T.muted,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{flag1} {label.split(" vs ")[0]}</div>
+          <div style={{fontSize:12,fontWeight:700,color:hasPred?color:T.muted,background:hasPred?color+"22":"transparent",borderRadius:6,padding:"2px 8px",flexShrink:0,minWidth:44,textAlign:"center"}}>
+            {hasPred?`${predH}–${predA}`:"—"}
+          </div>
+          <div style={{flex:1,fontSize:11,color:T.muted,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{flag2} {label.split(" vs ")[1]}</div>
+          <div style={{width:22,textAlign:"center",fontSize:11,fontWeight:700,color}}>{p===2?"✓2":p===1?"+1":p===0?"✗":"—"}</div>
         </div>
-        <div style={{flex:1,fontSize:11,color:T.muted,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{flag2} {label.split(" vs ")[1]}</div>
-        <div style={{width:22,textAlign:"center",fontSize:11,fontWeight:700,color}}>{p===2?"✓2":p===1?"+1":p===0?"✗":"—"}</div>
       </div>
     );
   };
@@ -1080,7 +1094,7 @@ function LeaderboardPage({leaderboard,prevLeaderboard,loading,myPseudo,onRefresh
                           <PredRow key={m.id} label={`${m.h} vs ${m.a}`}
                             predH={p.preds?.grp?.[m.id]?.h} predA={p.preds?.grp?.[m.id]?.a}
                             resH={results?.grp?.[m.id]?.h} resA={results?.grp?.[m.id]?.a}
-                            flag1={F[m.h]||"🏳"} flag2={F[m.a]||"🏳"}/>
+                            flag1={F[m.h]||"🏳"} flag2={F[m.a]||"🏳"} dateLabel={fmtMatchDate(schedule?.[m.id])}/>
                         ))}
                       </>
                     )}
@@ -1091,7 +1105,7 @@ function LeaderboardPage({leaderboard,prevLeaderboard,loading,myPseudo,onRefresh
                           <PredRow key={m.id} label={`${m.h} vs ${m.a}`}
                             predH={p.preds?.ko?.[m.id]?.h} predA={p.preds?.ko?.[m.id]?.a}
                             resH={results?.ko?.[m.id]?.h} resA={results?.ko?.[m.id]?.a}
-                            flag1={F[m.h]||"🏳"} flag2={F[m.a]||"🏳"}/>
+                            flag1={F[m.h]||"🏳"} flag2={F[m.a]||"🏳"} dateLabel={fmtMatchDate(schedule?.[m.id])}/>
                         ))}
                       </>
                     )}
