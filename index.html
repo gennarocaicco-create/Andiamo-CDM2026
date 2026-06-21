@@ -936,14 +936,17 @@ function LeaderboardPage({leaderboard,prevLeaderboard,loading,myPseudo,onRefresh
     return "same";
   };
 
-  // Matchs verrouillés uniquement (groupe + KO), triés par ordre chronologique (date de match)
+  // Matchs réellement LANCÉS (coup d'envoi passé), triés par ordre chronologique.
+  // NB : on se base sur le coup d'envoi réel, pas sur le verrouillage (qui arrive 30 min avant) —
+  // ainsi le dernier match de la liste est toujours le dernier match réellement joué.
+  const hasKickedOff=(ko)=> ko && new Date() >= new Date(ko);
   const byDate=(a,b)=>{
     const da=schedule?.[a.id]?new Date(schedule[a.id]).getTime():Infinity;
     const db=schedule?.[b.id]?new Date(schedule[b.id]).getTime():Infinity;
     return da-db;
   };
-  const lockedGrpMatches=GM.filter(m=>isMatchLocked(schedule?.[m.id])).sort(byDate);
-  const lockedKoMatches=KO_ROUNDS.flatMap(r=>(koMatches?.[r]||[]).filter(m=>isMatchLocked(schedule?.[m.id]))).sort(byDate);
+  const lockedGrpMatches=GM.filter(m=>hasKickedOff(schedule?.[m.id])).sort(byDate);
+  const lockedKoMatches=KO_ROUNDS.flatMap(r=>(koMatches?.[r]||[]).filter(m=>hasKickedOff(schedule?.[m.id]))).sort(byDate);
   const hasLocked=lockedGrpMatches.length>0||lockedKoMatches.length>0;
 
   const fmtMatchDate=(iso)=>{
