@@ -192,14 +192,17 @@ async function fetchWCMatches() {
     const matches = (data.matches || []).map(m => ({
       home: toFR(m.homeTeam?.name || ""),
       away: toFR(m.awayTeam?.name || ""),
-      scoreH: m.score?.fullTime?.home ?? null,
-      scoreA: m.score?.fullTime?.away ?? null,
+      // Score à la fin du temps réglementaire (90 min). Pour les matchs à élimination
+      // directe, l'API fournit "regularTime" (= score à 90 min) ; on l'utilise en priorité.
+      // Sinon (matchs de groupe, ou match en cours sans prolongation) "fullTime" EST le score 90 min.
+      scoreH: (m.score?.regularTime?.home ?? m.score?.fullTime?.home) ?? null,
+      scoreA: (m.score?.regularTime?.away ?? m.score?.fullTime?.away) ?? null,
       status: m.status,
       elapsed: m.minute || null,
       isLive: isLiveStatus(m.status),
       isHT: m.status === "PAUSED",
-      isET: false,
-      isPen: false,
+      isET: m.score?.duration === "EXTRA_TIME" || m.score?.duration === "PENALTY_SHOOTOUT",
+      isPen: m.score?.duration === "PENALTY_SHOOTOUT",
       isFinished: isFinishedStatus(m.status),
       utcDate: m.utcDate
     })).filter(m => m.home && m.away);
@@ -912,6 +915,9 @@ function KoPage({preds,results,koMatches,settings,activeRound,setActiveRound,onC
   return(
     <div style={{paddingTop:20}}>
       <PageTitle sub="Pronostiquez chaque tour au fur et à mesure">PHASE FINALE</PageTitle>
+      <div style={{background:"#10192b",border:`1px solid ${T.blue}44`,borderRadius:10,padding:"10px 14px",marginBottom:14,fontSize:12.5,color:T.text,lineHeight:1.5}}>
+        ⏱️ <b>Important :</b> en phase finale, les pronostics sont comptés sur le <b>score à la fin du temps réglementaire (90 min)</b>. Les prolongations et tirs au but ne comptent pas pour les points.
+      </div>
       <TabBar tabs={KO_ROUNDS.map(r=>({id:r,label:r,disabled:!(koMatches?.[r]?.length>0)}))} active={activeRound} onSelect={setActiveRound}/>
       {rms.length===0?(
         <div style={{background:T.card,borderRadius:12,padding:32,textAlign:"center",color:T.muted,border:`1px solid ${T.border}`}}>
