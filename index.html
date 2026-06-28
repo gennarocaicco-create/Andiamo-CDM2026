@@ -121,7 +121,11 @@ const { useState, useEffect, useRef, useCallback } = React;
   @keyframes slideDown { from{transform:translateY(-100%);opacity:0} to{transform:translateY(0);opacity:1} }
   .reminder-banner { animation: slideDown 0.4s ease-out; }
   @keyframes bounceIn { 0%{transform:scale(0)}60%{transform:scale(1.1)}100%{transform:scale(1)} }
-  .badge-pop { animation: bounceIn 0.5s ease-out; }`;
+  .badge-pop { animation: bounceIn 0.5s ease-out; }
+  @keyframes brkZoom { from{transform:scale(0.6);opacity:0} to{transform:scale(1);opacity:1} }
+  .brk-zoom { animation: brkZoom 0.22s cubic-bezier(0.34,1.3,0.64,1) both; }
+  @keyframes brkFade { from{opacity:0} to{opacity:1} }
+  .brk-fade { animation: brkFade 0.18s ease-out both; }`;
   document.head.appendChild(s);
 })();
 
@@ -629,6 +633,46 @@ const SCHEDULE = {
   "M70":"2026-06-23T19:00:00-04:00", // Croatie vs Panama
   "M71":"2026-06-27T17:00:00-04:00", // Angleterre vs Panama
   "M72":"2026-06-27T17:00:00-04:00", // Croatie vs Ghana
+
+  // ===== PHASE FINALE (heures en heure française CEST, +02:00) =====
+  // Seizièmes de finale (28 juin → 4 juillet) — IDs auto-générés KOSei1..KOSei16
+  "KOSei1":"2026-06-28T21:00:00+02:00",
+  "KOSei2":"2026-06-29T19:00:00+02:00",
+  "KOSei3":"2026-06-29T22:30:00+02:00",
+  "KOSei4":"2026-06-30T03:00:00+02:00",
+  "KOSei5":"2026-06-30T19:00:00+02:00",
+  "KOSei6":"2026-06-30T23:00:00+02:00",
+  "KOSei7":"2026-07-01T03:00:00+02:00",
+  "KOSei8":"2026-07-01T18:00:00+02:00",
+  "KOSei9":"2026-07-01T22:00:00+02:00",
+  "KOSei10":"2026-07-02T02:00:00+02:00",
+  "KOSei11":"2026-07-02T21:00:00+02:00",
+  "KOSei12":"2026-07-03T01:00:00+02:00",
+  "KOSei13":"2026-07-03T05:00:00+02:00",
+  "KOSei14":"2026-07-03T20:00:00+02:00",
+  "KOSei15":"2026-07-04T00:00:00+02:00",
+  "KOSei16":"2026-07-04T03:30:00+02:00",
+  // Huitièmes de finale (4 → 7 juillet) — KOHui1..KOHui8
+  "KOHui1":"2026-07-04T19:00:00+02:00",
+  "KOHui2":"2026-07-04T23:00:00+02:00",
+  "KOHui3":"2026-07-05T22:00:00+02:00",
+  "KOHui4":"2026-07-06T02:00:00+02:00",
+  "KOHui5":"2026-07-06T21:00:00+02:00",
+  "KOHui6":"2026-07-07T02:00:00+02:00",
+  "KOHui7":"2026-07-07T18:00:00+02:00",
+  "KOHui8":"2026-07-07T22:00:00+02:00",
+  // Quarts de finale (9 → 12 juillet) — KOQua1..KOQua4
+  "KOQua1":"2026-07-09T22:00:00+02:00",
+  "KOQua2":"2026-07-10T21:00:00+02:00",
+  "KOQua3":"2026-07-11T23:00:00+02:00",
+  "KOQua4":"2026-07-12T03:00:00+02:00",
+  // Demi-finales (14 → 15 juillet) — KODem1..KODem2
+  "KODem1":"2026-07-14T21:00:00+02:00",
+  "KODem2":"2026-07-15T21:00:00+02:00",
+  // Petite finale (18 juillet) — KOPet1
+  "KOPet1":"2026-07-18T23:00:00+02:00",
+  // Finale (19 juillet) — KOFin1
+  "KOFin1":"2026-07-19T21:00:00+02:00",
 };
 
 const T={bg:"#06090f",card:"#0e1520",card2:"#141e30",border:"#1c2a40",gold:"#fbbf24",green:"#22c55e",blue:"#60a5fa",red:"#f87171",text:"#f1f5f9",muted:"#64748b",purple:"#a78bfa"};
@@ -905,6 +949,97 @@ function BonusPage({preds,settings,onChangeBonus}){
           {br.s&&<div style={{marginTop:10,padding:"8px 12px",background:T.card2,borderRadius:8,fontSize:13}}>Résultat officiel : <strong style={{color:T.text}}>{br.s}</strong></div>}
         </BonusCard>
       </div>
+    </div>
+  );
+}
+
+const KO_PREFIX = {"Seizièmes":"Sei","Huitièmes":"Hui","Quarts":"Qua","Demi-finales":"Dem","Petite finale":"Pet","Finale":"Fin"};
+
+// Arbre interactif de la phase finale (tout le tableau d'un coup, façon FIFA)
+function BracketView({preds,results,koMatches,onChangePred,schedule,liveData}){
+  const [sel,setSel]=useState(null); // match sélectionné -> {round, m}
+  const koId=(round,i)=>`KO${KO_PREFIX[round]}${i+1}`;
+  const fmtC=(iso)=>{ if(!iso) return ""; const d=new Date(iso); if(isNaN(d)) return ""; const p=n=>String(n).padStart(2,"0"); return `${p(d.getDate())}/${p(d.getMonth()+1)} ${p(d.getHours())}h${d.getMinutes()?p(d.getMinutes()):""}`; };
+  const shortT=(name)=> name ? (name.length>11?name.slice(0,10)+"…":name) : "—";
+
+  const TeamLine=({flag,name,score,win})=>(
+    <div style={{display:"flex",alignItems:"center",gap:4}}>
+      <span style={{fontSize:11,flexShrink:0}}>{flag||"🏳"}</span>
+      <span style={{fontSize:11,fontWeight:win?700:500,color:win?T.text:T.muted,flex:1,overflow:"hidden",whiteSpace:"nowrap",textOverflow:"ellipsis"}}>{name}</span>
+      <span style={{fontSize:11,fontWeight:700,color:score!==""&&score!=null?T.gold:"#33425c",width:12,textAlign:"center",flexShrink:0}}>{score!==""&&score!=null?score:"·"}</span>
+    </div>
+  );
+
+  const Cell=({round,i})=>{
+    const list=koMatches?.[round]||[];
+    const m=list[i];
+    const id=m?.id||koId(round,i);
+    const date=m?.date||schedule?.[id];
+    const pred=m?(preds.ko?.[m.id]||{}):null;
+    const result=m?results.ko?.[m.id]:null;
+    const live=m?getLiveMatch(liveData,m.h,m.a):null;
+    const flip=live?.officialReversed||false;
+    const lT=m?(flip?m.a:m.h):null, rT=m?(flip?m.h:m.a):null;
+    const pH=pred?(flip?pred.a:pred.h):"", pA=pred?(flip?pred.h:pred.a):"";
+    const hasPred=pH!==""&&pH!=null&&pA!==""&&pA!=null;
+    const pts=(m&&result&&pred&&pred.h!=null&&pred.h!=="")?matchPts(pred,result):null;
+    const locked=date&&isMatchLocked(date);
+    const bc=pts===2?T.green:pts===1?T.blue:pts===0?T.red:(locked?"#f97316":T.border);
+    const rH=result?(flip?result.a:result.h):null, rA=result?(flip?result.h:result.a):null;
+    const wL=result&&rH>rA, wR=result&&rA>rH;
+    return (
+      <button onClick={()=>m&&setSel({round,m})} disabled={!m}
+        style={{width:"100%",textAlign:"left",background:m?T.card:"#0a0f17",border:`1.5px solid ${bc}`,borderRadius:9,padding:"5px 7px",cursor:m?"pointer":"default",opacity:m?1:0.5,position:"relative",fontFamily:"Inter,sans-serif",transition:"transform 0.1s"}}>
+        {date&&<div style={{fontSize:8,color:live?.isLive?"#22c55e":T.muted,marginBottom:3,fontWeight:600,letterSpacing:0.2,textAlign:"center"}}>{live?.isLive?"🔴 ":""}{fmtC(date)}</div>}
+        <TeamLine flag={F[lT]} name={shortT(lT)} score={hasPred?pH:""} win={wL}/>
+        <div style={{height:3}}/>
+        <TeamLine flag={F[rT]} name={shortT(rT)} score={hasPred?pA:""} win={wR}/>
+        {pts!=null&&<div style={{position:"absolute",top:-7,right:-6,background:bc,color:"#030609",fontSize:9,fontWeight:800,borderRadius:6,padding:"1px 4px"}}>{pts===2?"+2":pts===1?"+1":"0"}</div>}
+        {hasPred&&pts==null&&!locked&&<div style={{position:"absolute",top:-7,right:-6,background:T.gold,color:"#030609",fontSize:8,fontWeight:800,borderRadius:6,padding:"1px 4px"}}>✓</div>}
+      </button>
+    );
+  };
+
+  const Col=({round,from,to})=>(
+    <div style={{display:"flex",flexDirection:"column",justifyContent:"space-around",minWidth:126,maxWidth:126,padding:"0 4px"}}>
+      {Array.from({length:to-from}).map((_,k)=><Cell key={round+(from+k)} round={round} i={from+k}/>)}
+    </div>
+  );
+
+  return (
+    <div>
+      <div style={{overflowX:"auto",overflowY:"hidden",WebkitOverflowScrolling:"touch",padding:"6px 0 10px",margin:"0 -16px",paddingLeft:8,paddingRight:8}}>
+        <div style={{display:"flex",alignItems:"stretch",minHeight:580,width:"max-content"}}>
+          <Col round="Seizièmes" from={0} to={8}/>
+          <Col round="Huitièmes" from={0} to={4}/>
+          <Col round="Quarts" from={0} to={2}/>
+          <Col round="Demi-finales" from={0} to={1}/>
+          <div style={{display:"flex",flexDirection:"column",justifyContent:"center",alignItems:"center",minWidth:150,maxWidth:150,padding:"0 6px",gap:16}}>
+            <div style={{fontSize:26,filter:"drop-shadow(0 2px 6px rgba(251,191,36,0.4))"}}>🏆</div>
+            <div style={{width:"100%",boxShadow:"0 0 0 1px rgba(251,191,36,0.3)",borderRadius:11}}><Cell round="Finale" i={0}/></div>
+            <div style={{width:"100%",opacity:0.9}}>
+              <div style={{fontSize:8,color:"#b45309",textAlign:"center",marginBottom:3,fontWeight:800,letterSpacing:0.5}}>🥉 3ᵉ PLACE</div>
+              <Cell round="Petite finale" i={0}/>
+            </div>
+          </div>
+          <Col round="Demi-finales" from={1} to={2}/>
+          <Col round="Quarts" from={2} to={4}/>
+          <Col round="Huitièmes" from={4} to={8}/>
+          <Col round="Seizièmes" from={8} to={16}/>
+        </div>
+      </div>
+      <div style={{textAlign:"center",fontSize:11,color:T.muted,marginTop:6,lineHeight:1.5}}>👆 Touchez un match pour pronostiquer · glissez pour voir tout le tableau</div>
+      {sel&&(
+        <div className="brk-fade" onClick={()=>setSel(null)} style={{position:"fixed",inset:0,background:"rgba(3,6,9,0.88)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+          <div className="brk-zoom" onClick={e=>e.stopPropagation()} style={{width:"100%",maxWidth:430,background:T.bg,borderRadius:18,padding:16,maxHeight:"92vh",overflowY:"auto",border:`1px solid ${T.border}`,boxShadow:"0 24px 70px rgba(0,0,0,0.65)"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+              <div style={{color:T.gold,fontWeight:800,fontFamily:"'Barlow Condensed',sans-serif",fontSize:21,letterSpacing:1}}>{sel.round}</div>
+              <button onClick={()=>setSel(null)} style={{background:T.card2,color:T.text,border:`1px solid ${T.border}`,borderRadius:"50%",width:32,height:32,fontSize:15,cursor:"pointer",lineHeight:1,flexShrink:0}}>✕</button>
+            </div>
+            <MatchCard match={{h:sel.m.h,a:sel.m.a}} pred={preds.ko?.[sel.m.id]||{}} result={results.ko?.[sel.m.id]} onChangePred={(f,v)=>onChangePred("ko",sel.m.id,f,v)} kickoff={sel.m.date||schedule?.[sel.m.id]} live={getLiveMatch(liveData,sel.m.h,sel.m.a)}/>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1775,9 +1910,9 @@ function AdminPage({results,settings,koMatches,players,saveResult,deleteResult,s
               </div>
               <div style={{display:"flex",alignItems:"center",gap:8,marginTop:8,paddingTop:8,borderTop:`1px solid ${T.border}44`}}>
                 <span style={{fontSize:12,color:T.muted,flexShrink:0}}>📅 Date/heure :</span>
-                <input type="datetime-local" value={isoToLocalInput(m.date)} onChange={e=>{const v=e.target.value; updateKoMatchDate(activeRound,m.id, v?new Date(v).toISOString():"");}} style={{flex:1,background:"#111b2d",border:`1px solid ${m.date?T.blue+"66":T.border}`,borderRadius:8,padding:"7px 10px",color:"#fff",fontFamily:"Inter,sans-serif",fontSize:13,outline:"none",colorScheme:"dark"}}/>
+                <input type="datetime-local" value={isoToLocalInput(m.date||SCHEDULE[m.id])} onChange={e=>{const v=e.target.value; updateKoMatchDate(activeRound,m.id, v?new Date(v).toISOString():"");}} style={{flex:1,background:"#111b2d",border:`1px solid ${(m.date||SCHEDULE[m.id])?T.blue+"66":T.border}`,borderRadius:8,padding:"7px 10px",color:"#fff",fontFamily:"Inter,sans-serif",fontSize:13,outline:"none",colorScheme:"dark"}}/>
               </div>
-              {!m.date&&<div style={{fontSize:11,color:"#f97316",marginTop:6}}>⚠️ Sans date, le match ne se verrouillera pas automatiquement.</div>}
+              {!(m.date||SCHEDULE[m.id])&&<div style={{fontSize:11,color:"#f97316",marginTop:6}}>⚠️ Sans date, le match ne se verrouillera pas automatiquement.</div>}
             </div>
           ))}
           {!(koMatches?.[activeRound]?.length>0)&&<div style={{textAlign:"center",color:T.muted,padding:20,fontSize:14}}>Aucun match saisi pour ce tour.</div>}
