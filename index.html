@@ -1055,20 +1055,13 @@ function KoPage({preds,results,koMatches,settings,activeRound,setActiveRound,onC
       </div>
     </div>
   );
-  const rms=koMatches?.[activeRound]||[];
   return(
     <div style={{paddingTop:20}}>
-      <PageTitle sub="Pronostiquez chaque tour au fur et à mesure">PHASE FINALE</PageTitle>
-      <div style={{background:"#10192b",border:`1px solid ${T.blue}44`,borderRadius:10,padding:"10px 14px",marginBottom:14,fontSize:12.5,color:T.text,lineHeight:1.5}}>
+      <PageTitle sub="Le tableau complet — touchez un match pour pronostiquer">PHASE FINALE</PageTitle>
+      <div style={{background:"#10192b",border:`1px solid ${T.blue}44`,borderRadius:10,padding:"10px 14px",marginBottom:8,fontSize:12.5,color:T.text,lineHeight:1.5}}>
         ⏱️ <b>Important :</b> en phase finale, les pronostics sont comptés sur le <b>score à la fin du temps réglementaire (90 min)</b>. Les prolongations et tirs au but ne comptent pas pour les points.
       </div>
-      <TabBar tabs={KO_ROUNDS.map(r=>({id:r,label:r,disabled:!(koMatches?.[r]?.length>0)}))} active={activeRound} onSelect={setActiveRound}/>
-      {rms.length===0?(
-        <div style={{background:T.card,borderRadius:12,padding:32,textAlign:"center",color:T.muted,border:`1px solid ${T.border}`}}>
-          <div style={{fontSize:32,marginBottom:10}}>⚽</div>
-          Les matchs de ce tour n'ont pas encore été saisis par l'administrateur.
-        </div>
-      ):rms.map(m=>(<MatchCard key={m.id} match={{h:m.h,a:m.a}} pred={preds.ko?.[m.id]||{}} result={results.ko?.[m.id]} onChangePred={(field,val)=>onChangePred("ko",m.id,field,val)} kickoff={m.date||schedule?.[m.id]} live={getLiveMatch(liveData,m.h,m.a)}/>))}
+      <BracketView preds={preds} results={results} koMatches={koMatches} onChangePred={onChangePred} schedule={schedule} liveData={liveData}/>
     </div>
   );
 }
