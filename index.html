@@ -644,6 +644,15 @@ const isMatchLocked = (kickoff) => {
   return new Date() >= new Date(new Date(kickoff).getTime() - 30*60*1000);
 };
 
+// ISO → valeur pour <input type="datetime-local"> (en heure locale du navigateur)
+const isoToLocalInput = (iso) => {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d)) return "";
+  const pad = n => String(n).padStart(2,"0");
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+
 const MatchCard=({match,pred,result,onChangePred,kickoff,live})=>{
   const p=matchPts(pred,result);
   const locked=isMatchLocked(kickoff);
@@ -924,7 +933,7 @@ function KoPage({preds,results,koMatches,settings,activeRound,setActiveRound,onC
           <div style={{fontSize:32,marginBottom:10}}>⚽</div>
           Les matchs de ce tour n'ont pas encore été saisis par l'administrateur.
         </div>
-      ):rms.map(m=>(<MatchCard key={m.id} match={{h:m.h,a:m.a}} pred={preds.ko?.[m.id]||{}} result={results.ko?.[m.id]} onChangePred={(field,val)=>onChangePred("ko",m.id,field,val)} kickoff={schedule?.[m.id]} live={getLiveMatch(liveData,m.h,m.a)}/>))}
+      ):rms.map(m=>(<MatchCard key={m.id} match={{h:m.h,a:m.a}} pred={preds.ko?.[m.id]||{}} result={results.ko?.[m.id]} onChangePred={(field,val)=>onChangePred("ko",m.id,field,val)} kickoff={m.date||schedule?.[m.id]} live={getLiveMatch(liveData,m.h,m.a)}/>))}
     </div>
   );
 }
@@ -1597,7 +1606,7 @@ function QualificationsPanel({results,koMatches,addKoMatch}){
   );
 }
 
-function AdminPage({results,settings,koMatches,players,saveResult,deleteResult,saveSettings,addKoMatch,removeKoMatch,adminTab,setAdminTab,activeGroup,setActiveGroup,activeRound,setActiveRound,setResults,setPlayers,leaderboard,prevLeaderboard,loadLeaderboard}){
+function AdminPage({results,settings,koMatches,players,saveResult,deleteResult,saveSettings,addKoMatch,removeKoMatch,updateKoMatchDate,adminTab,setAdminTab,activeGroup,setActiveGroup,activeRound,setActiveRound,setResults,setPlayers,leaderboard,prevLeaderboard,loadLeaderboard}){
   const[tmp,setTmp]=useState({});
   const[newH,setNewH]=useState("");
   const[newA,setNewA]=useState("");
@@ -1759,9 +1768,16 @@ function AdminPage({results,settings,koMatches,players,saveResult,deleteResult,s
             </div>
           </div>
           {(koMatches?.[activeRound]||[]).map(m=>(
-            <div key={m.id} style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
-              <div style={{flex:1}}><RRow type="ko" id={m.id} home={m.h} away={m.a}/></div>
-              <button onClick={()=>removeKoMatch(activeRound,m.id)} style={{background:"transparent",color:"#374151",border:"none",fontSize:20,cursor:"pointer",padding:"0 4px",marginBottom:6}}>×</button>
+            <div key={m.id} style={{background:T.card,borderRadius:10,padding:"10px 12px",marginBottom:8,border:`1px solid ${T.border}`}}>
+              <div style={{display:"flex",alignItems:"center",gap:6}}>
+                <div style={{flex:1}}><RRow type="ko" id={m.id} home={m.h} away={m.a}/></div>
+                <button onClick={()=>removeKoMatch(activeRound,m.id)} style={{background:"transparent",color:"#374151",border:"none",fontSize:20,cursor:"pointer",padding:"0 4px"}}>×</button>
+              </div>
+              <div style={{display:"flex",alignItems:"center",gap:8,marginTop:8,paddingTop:8,borderTop:`1px solid ${T.border}44`}}>
+                <span style={{fontSize:12,color:T.muted,flexShrink:0}}>📅 Date/heure :</span>
+                <input type="datetime-local" value={isoToLocalInput(m.date)} onChange={e=>{const v=e.target.value; updateKoMatchDate(activeRound,m.id, v?new Date(v).toISOString():"");}} style={{flex:1,background:"#111b2d",border:`1px solid ${m.date?T.blue+"66":T.border}`,borderRadius:8,padding:"7px 10px",color:"#fff",fontFamily:"Inter,sans-serif",fontSize:13,outline:"none",colorScheme:"dark"}}/>
+              </div>
+              {!m.date&&<div style={{fontSize:11,color:"#f97316",marginTop:6}}>⚠️ Sans date, le match ne se verrouillera pas automatiquement.</div>}
             </div>
           ))}
           {!(koMatches?.[activeRound]?.length>0)&&<div style={{textAlign:"center",color:T.muted,padding:20,fontSize:14}}>Aucun match saisi pour ce tour.</div>}
@@ -2384,6 +2400,10 @@ function App(){
     const updated={...koMatches,[round]:[...prev,{id,h,a}]};
     setKoMatches(updated);await ss("koMatches",updated);
   };
+  const updateKoMatchDate=async(round,id,date)=>{
+    const updated={...koMatches,[round]:(koMatches[round]||[]).map(m=>m.id===id?{...m,date}:m)};
+    setKoMatches(updated);await ss("koMatches",updated);
+  };
   const removeKoMatch=async(round,id)=>{
     const updated={...koMatches,[round]:(koMatches[round]||[]).filter(m=>m.id!==id)};
     setKoMatches(updated);await ss("koMatches",updated);
@@ -2589,7 +2609,7 @@ function App(){
             )}
           </div>
         )}
-        {page==="admin"&&<AdminPage results={results} settings={settings} koMatches={koMatches} players={players} saveResult={saveResult} deleteResult={deleteResult} saveSettings={saveSettings} addKoMatch={addKoMatch} removeKoMatch={removeKoMatch} adminTab={adminTab} setAdminTab={setAdminTab} activeGroup={activeGroup} setActiveGroup={setActiveGroup} activeRound={activeRound} setActiveRound={setActiveRound} setResults={setResults} setPlayers={setPlayers} leaderboard={leaderboard} prevLeaderboard={prevLeaderboard} loadLeaderboard={loadLeaderboard}/>}
+        {page==="admin"&&<AdminPage results={results} settings={settings} koMatches={koMatches} players={players} saveResult={saveResult} deleteResult={deleteResult} saveSettings={saveSettings} addKoMatch={addKoMatch} removeKoMatch={removeKoMatch} updateKoMatchDate={updateKoMatchDate} adminTab={adminTab} setAdminTab={setAdminTab} activeGroup={activeGroup} setActiveGroup={setActiveGroup} activeRound={activeRound} setActiveRound={setActiveRound} setResults={setResults} setPlayers={setPlayers} leaderboard={leaderboard} prevLeaderboard={prevLeaderboard} loadLeaderboard={loadLeaderboard}/>}
       </div>
 
       {/* Barre de navigation bas — style Instagram */}
