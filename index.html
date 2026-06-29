@@ -966,6 +966,45 @@ function BonusPage({preds,settings,onChangeBonus}){
 }
 
 const KO_PREFIX = {"Seizièmes":"Sei","Huitièmes":"Hui","Quarts":"Qua","Demi-finales":"Dem","Petite finale":"Pet","Finale":"Fin"};
+// Progression des vainqueurs d'un tour vers le suivant
+const NEXT_ROUND = {"Seizièmes":"Huitièmes","Huitièmes":"Quarts","Quarts":"Demi-finales","Demi-finales":"Finale"};
+// Vainqueur d'un match KO : 90 min, sinon prolongation, sinon tirs au but (renvoie "h"/"a"/null)
+function koWinnerSide(result){
+  if(!result) return null;
+  if(result.penH!=null&&result.penA!=null) return result.penH>result.penA?"h":result.penA>result.penH?"a":null;
+  if(result.etH!=null&&result.etA!=null) return result.etH>result.etA?"h":result.etA>result.etH?"a":null;
+  if(result.h==null||result.a==null) return null;
+  return result.h>result.a?"h":result.a>result.h?"a":null;
+}
+// Position (0-indexée) d'un match d'après son ID (ex. KOSei5 -> 4)
+function koPosFromId(id){ const m=(id||"").match(/KO[A-Za-z]+(\d+)/); return m?(+m[1]-1):0; }
+// Fait avancer automatiquement le vainqueur (et le perdant des demies vers la petite finale)
+function koAdvance(koMatches, round, matchId, result){
+  const list = koMatches[round]||[];
+  const m = list.find(x=>x && x.id===matchId);
+  if(!m) return koMatches;
+  const side = koWinnerSide(result);
+  if(!side) return koMatches; // nul sans départage -> on n'avance pas
+  const winner = side==="h"?m.h:m.a;
+  const loser  = side==="h"?m.a:m.h;
+  if(!winner) return koMatches;
+  const pos = koPosFromId(matchId);
+  const targetIdx = Math.floor(pos/2);
+  const slot = pos%2===0 ? "h" : "a";
+  let updated = {...koMatches};
+  const place=(nextRound, team)=>{
+    const id = `KO${KO_PREFIX[nextRound]}${targetIdx+1}`;
+    const arr = [...(updated[nextRound]||[])];
+    const ei = arr.findIndex(x=>x && x.id===id);
+    if(ei>=0) arr[ei] = {...arr[ei], [slot]: team};
+    else arr.push({id, h: slot==="h"?team:"", a: slot==="a"?team:""});
+    updated[nextRound] = arr;
+  };
+  const nextR = NEXT_ROUND[round];
+  if(nextR) place(nextR, winner);
+  if(round==="Demi-finales" && loser) place("Petite finale", loser);
+  return updated;
+}
 
 // Arbre interactif de la phase finale (tout le tableau d'un coup, façon FIFA)
 function BracketView({preds,results,koMatches,onChangePred,schedule,liveData}){
@@ -984,31 +1023,27 @@ function BracketView({preds,results,koMatches,onChangePred,schedule,liveData}){
 
   const Cell=({round,i})=>{
     const list=koMatches?.[round]||[];
-    const m=list[i];
-    const id=m?.id||koId(round,i);
+    const id=koId(round,i);
+    const m=list.find(x=>x && x.id===id);
+    const bothKnown=!!(m && m.h && m.a);
     const date=m?.date||schedule?.[id];
     const pred=m?(preds.ko?.[m.id]||{}):null;
     const result=m?results.ko?.[m.id]:null;
-    const live=m?getLiveMatch(liveData,m.h,m.a):null;
+    const live=bothKnown?getLiveMatch(liveData,m.h,m.a):null;
     const flip=live?.officialReversed||false;
     const lT=m?(flip?m.a:m.h):null, rT=m?(flip?m.h:m.a):null;
     const pH=pred?(flip?pred.a:pred.h):"", pA=pred?(flip?pred.h:pred.a):"";
     const hasPred=pH!==""&&pH!=null&&pA!==""&&pA!=null;
-    const pts=(m&&result&&pred&&pred.h!=null&&pred.h!=="")?matchPts(pred,result):null;
+    const pts=(bothKnown&&result&&pred&&pred.h!=null&&pred.h!=="")?matchPts(pred,result):null;
     const locked=date&&isMatchLocked(date);
     const bc=pts===2?T.green:pts===1?T.blue:pts===0?T.red:(locked?"#f97316":T.border);
     // Vainqueur réel pour l'arbre : 90 min, sinon prolongation, sinon tirs au but
-    const winSide=(()=>{
-      if(!result) return null;
-      if(result.penH!=null&&result.penA!=null) return result.penH>result.penA?"h":result.penA>result.penH?"a":null;
-      if(result.etH!=null&&result.etA!=null) return result.etH>result.etA?"h":result.etA>result.etH?"a":null;
-      return result.h>result.a?"h":result.a>result.h?"a":null;
-    })();
+    const winSide=koWinnerSide(result);
     const wL=winSide===(flip?"a":"h"), wR=winSide===(flip?"h":"a");
     const decidedBy=result?(result.penH!=null?"t.a.b.":result.etH!=null?"a.p.":null):null;
     return (
-      <button onClick={()=>m&&setSel({round,m})} disabled={!m}
-        style={{width:"100%",textAlign:"left",background:m?T.card:"#0a0f17",border:`1.5px solid ${bc}`,borderRadius:9,padding:"5px 7px",cursor:m?"pointer":"default",opacity:m?1:0.5,position:"relative",fontFamily:"Inter,sans-serif",transition:"transform 0.1s"}}>
+      <button onClick={()=>bothKnown&&setSel({round,m})} disabled={!bothKnown}
+        style={{width:"100%",textAlign:"left",background:m?T.card:"#0a0f17",border:`1.5px solid ${bc}`,borderRadius:9,padding:"5px 7px",cursor:bothKnown?"pointer":"default",opacity:bothKnown?1:0.5,position:"relative",fontFamily:"Inter,sans-serif",transition:"transform 0.1s"}}>
         {(date||decidedBy)&&<div style={{fontSize:8,color:live?.isLive?"#22c55e":decidedBy?"#a78bfa":T.muted,marginBottom:3,fontWeight:600,letterSpacing:0.2,textAlign:"center"}}>{live?.isLive?"🔴 ":""}{fmtC(date)}{decidedBy?` · ${decidedBy}`:""}</div>}
         <TeamLine flag={F[lT]} name={shortT(lT)} score={hasPred?pH:""} win={wL}/>
         <div style={{height:3}}/>
@@ -1846,6 +1881,11 @@ function AdminPage({results,settings,koMatches,players,saveResult,deleteResult,s
       const updated = { ...results, ko };
       setResults(updated);
       await ss("results", updated);
+      // ⚡ Faire avancer automatiquement les vainqueurs des matchs synchronisés
+      let newKo = koMatchesRef.current || {};
+      const before = JSON.stringify(newKo);
+      allKo.forEach(local => { if(ko[local.id]) newKo = koAdvance(newKo, local.round, local.id, ko[local.id]); });
+      if(JSON.stringify(newKo) !== before){ setKoMatches(newKo); await ss("koMatches", newKo); }
       setSyncMsg(`✓ ${count} résultat${count>1?"s":""} de phase finale mis à jour !`);
     } catch(e) {
       setSyncMsg(`⚠ Erreur : ${e.message}. Réessayez.`);
@@ -1951,14 +1991,14 @@ function AdminPage({results,settings,koMatches,players,saveResult,deleteResult,s
             </div>
           </div>
           {(koMatches?.[activeRound]||[]).map(m=>(
-            <div key={m.id} style={{background:T.card,borderRadius:10,padding:"10px 12px",marginBottom:8,border:`1px solid ${T.border}`}}>
-              <div style={{display:"flex",alignItems:"center",gap:6}}>
-                <div style={{flex:1}}><RRow type="ko" id={m.id} home={m.h} away={m.a} ko={true}/></div>
-                <button onClick={()=>removeKoMatch(activeRound,m.id)} style={{background:"transparent",color:"#374151",border:"none",fontSize:20,cursor:"pointer",padding:"0 4px"}}>×</button>
-              </div>
-              <div style={{display:"flex",alignItems:"center",gap:8,marginTop:8,paddingTop:8,borderTop:`1px solid ${T.border}44`}}>
-                <span style={{fontSize:12,color:T.muted,flexShrink:0}}>📅 Date/heure :</span>
-                <input type="datetime-local" value={isoToLocalInput(m.date||SCHEDULE[m.id])} onChange={e=>{const v=e.target.value; updateKoMatchDate(activeRound,m.id, v?new Date(v).toISOString():"");}} style={{flex:1,background:"#111b2d",border:`1px solid ${(m.date||SCHEDULE[m.id])?T.blue+"66":T.border}`,borderRadius:8,padding:"7px 10px",color:"#fff",fontFamily:"Inter,sans-serif",fontSize:13,outline:"none",colorScheme:"dark"}}/>
+            <div key={m.id} style={{marginBottom:14}}>
+              <RRow type="ko" id={m.id} home={m.h} away={m.a} ko={true}/>
+              <div style={{display:"flex",alignItems:"stretch",gap:8,marginTop:6}}>
+                <div style={{flex:1,display:"flex",alignItems:"center",gap:6,background:T.card,borderRadius:8,padding:"6px 10px",border:`1px solid ${(m.date||SCHEDULE[m.id])?T.blue+"55":T.border}`}}>
+                  <span style={{fontSize:12,color:T.muted,flexShrink:0}}>📅</span>
+                  <input type="datetime-local" value={isoToLocalInput(m.date||SCHEDULE[m.id])} onChange={e=>{const v=e.target.value; updateKoMatchDate(activeRound,m.id, v?new Date(v).toISOString():"");}} style={{flex:1,minWidth:0,background:"transparent",border:"none",color:"#fff",fontFamily:"Inter,sans-serif",fontSize:13,outline:"none",colorScheme:"dark"}}/>
+                </div>
+                <button onClick={()=>{if(confirm(`Retirer ce match du tableau ?\n${m.h||"?"} vs ${m.a||"?"}`)) removeKoMatch(activeRound,m.id);}} style={{background:"#2a1418",color:T.red,border:`1px solid ${T.red}55`,borderRadius:8,padding:"6px 12px",fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"Inter,sans-serif",flexShrink:0,display:"flex",alignItems:"center",gap:5}}>🗑️ Retirer</button>
               </div>
               {!(m.date||SCHEDULE[m.id])&&<div style={{fontSize:11,color:"#f97316",marginTop:6}}>⚠️ Sans date, le match ne se verrouillera pas automatiquement.</div>}
             </div>
@@ -2554,6 +2594,16 @@ function App(){
     if(extra.penH!=null&&extra.penA!=null){rec.penH=extra.penH;rec.penA=extra.penA;}
     const updated={...results,[type]:{...results[type],[id]:rec}};
     setResults(updated);await ss("results",updated);
+    // ⚡ Phase finale : faire avancer automatiquement le vainqueur dans la case suivante
+    if(type==="ko"){
+      const km=koMatchesRef.current||{};
+      let round=null;
+      for(const r of KO_ROUNDS){ if((km[r]||[]).some(x=>x&&x.id===id)){ round=r; break; } }
+      if(round){
+        const newKo=koAdvance(km, round, id, rec);
+        if(newKo!==km){ setKoMatches(newKo); await ss("koMatches", newKo); }
+      }
+    }
     // Snapshot du classement après chaque résultat
     try {
       const allPlayers = await sg("players", {});
