@@ -1006,9 +1006,16 @@ function koAdvance(koMatches, round, matchId, result){
 }
 
 // Arbre interactif de la phase finale (tout le tableau d'un coup, façon FIFA)
-function BracketView({preds,results,koMatches,onChangePred,schedule,liveData}){
-  const [sel,setSel]=useState(null); // match sélectionné -> {round, m}
+function BracketView({preds,results,koMatches,onChangePred,schedule,liveData,admin,onSaveResult,onSetDate,onSetTeams,onRemoveMatch}){
+  const [sel,setSel]=useState(null); // match sélectionné (mode joueur) -> {round, m}
+  const [ed,setEd]=useState(null); // édition admin -> {round, m, ...champs}
   const koId=(round,i)=>`KO${KO_PREFIX[round]}${i+1}`;
+  const openMatch=(round,m)=>{
+    if(admin){
+      const r=results.ko?.[m.id]||{};
+      setEd({round,m,h:r.h??"",a:r.a??"",etH:r.etH??"",etA:r.etA??"",penH:r.penH??"",penA:r.penA??"",teamH:m.h||"",teamA:m.a||""});
+    } else setSel({round,m});
+  };
   const fmtC=(iso)=>{ if(!iso) return ""; const d=new Date(iso); if(isNaN(d)) return ""; const p=n=>String(n).padStart(2,"0"); return `${p(d.getDate())}/${p(d.getMonth()+1)} ${p(d.getHours())}h${d.getMinutes()?p(d.getMinutes()):""}`; };
   const shortT=(name)=> name ? (name.length>11?name.slice(0,10)+"…":name) : "—";
 
@@ -1040,9 +1047,10 @@ function BracketView({preds,results,koMatches,onChangePred,schedule,liveData}){
     const winSide=koWinnerSide(result);
     const wL=winSide===(flip?"a":"h"), wR=winSide===(flip?"h":"a");
     const decidedBy=result?(result.penH!=null?"t.a.b.":result.etH!=null?"a.p.":null):null;
+    const canTap = admin ? !!m : bothKnown;
     return (
-      <button onClick={()=>bothKnown&&setSel({round,m})} disabled={!bothKnown}
-        style={{width:"100%",textAlign:"left",background:m?T.card:"#0a0f17",border:`1.5px solid ${bc}`,borderRadius:9,padding:"5px 7px",cursor:bothKnown?"pointer":"default",opacity:bothKnown?1:0.5,position:"relative",fontFamily:"Inter,sans-serif",transition:"transform 0.1s"}}>
+      <button onClick={()=>canTap&&openMatch(round,m)} disabled={!canTap}
+        style={{width:"100%",textAlign:"left",background:m?T.card:"#0a0f17",border:`1.5px solid ${bc}`,borderRadius:9,padding:"5px 7px",cursor:canTap?"pointer":"default",opacity:canTap?1:0.5,position:"relative",fontFamily:"Inter,sans-serif",transition:"transform 0.1s"}}>
         {(date||decidedBy)&&<div style={{fontSize:8,color:live?.isLive?"#22c55e":decidedBy?"#a78bfa":T.muted,marginBottom:3,fontWeight:600,letterSpacing:0.2,textAlign:"center"}}>{live?.isLive?"🔴 ":""}{fmtC(date)}{decidedBy?` · ${decidedBy}`:""}</div>}
         <TeamLine flag={F[lT]} name={shortT(lT)} score={hasPred?pH:""} win={wL}/>
         <div style={{height:3}}/>
@@ -1081,7 +1089,7 @@ function BracketView({preds,results,koMatches,onChangePred,schedule,liveData}){
           <Col round="Seizièmes" from={8} to={16}/>
         </div>
       </div>
-      <div style={{textAlign:"center",fontSize:11,color:T.muted,marginTop:6,lineHeight:1.5}}>👆 Touchez un match pour pronostiquer · glissez pour voir tout le tableau</div>
+      <div style={{textAlign:"center",fontSize:11,color:T.muted,marginTop:6,lineHeight:1.5}}>{admin?"👆 Touchez un match pour saisir le résultat (le vainqueur avance tout seul)":"👆 Touchez un match pour pronostiquer · glissez pour voir tout le tableau"}</div>
       {sel&&(
         <div className="brk-fade" onClick={()=>setSel(null)} style={{position:"fixed",inset:0,background:"rgba(3,6,9,0.88)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
           <div className="brk-zoom" onClick={e=>e.stopPropagation()} style={{width:"100%",maxWidth:430,background:T.bg,borderRadius:18,padding:16,maxHeight:"92vh",overflowY:"auto",border:`1px solid ${T.border}`,boxShadow:"0 24px 70px rgba(0,0,0,0.65)"}}>
@@ -1093,12 +1101,57 @@ function BracketView({preds,results,koMatches,onChangePred,schedule,liveData}){
           </div>
         </div>
       )}
+      {ed&&(()=>{
+        const sIn=(field,color)=>(<input type="number" min="0" max="40" value={ed[field]} onChange={e=>setEd(p=>({...p,[field]:e.target.value}))} style={{width:46,background:"#0c1422",border:`1px solid ${color||T.border}`,borderRadius:7,padding:"7px 0",color:"#fff",fontSize:17,fontWeight:700,textAlign:"center",outline:"none",fontFamily:"Inter,sans-serif"}}/>);
+        const row=(label,fh,fa,col)=>(<div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}><div style={{flex:1,textAlign:"right",fontSize:12,color:col||T.muted,fontWeight:600}}>{label}</div>{sIn(fh,col)}<span style={{color:T.muted}}>:</span>{sIn(fa,col)}<div style={{flex:1}}/></div>);
+        const save=()=>{
+          if((ed.teamH!==ed.m.h)||(ed.teamA!==ed.m.a)) onSetTeams(ed.round, ed.m.id, ed.teamH, ed.teamA);
+          if(ed.h!==""&&ed.a!==""){
+            const extra={};
+            if(ed.etH!==""&&ed.etA!=="") {extra.etH=+ed.etH; extra.etA=+ed.etA;}
+            if(ed.penH!==""&&ed.penA!=="") {extra.penH=+ed.penH; extra.penA=+ed.penA;}
+            onSaveResult("ko", ed.m.id, +ed.h, +ed.a, extra);
+          }
+          setEd(null);
+        };
+        return (
+          <div className="brk-fade" onClick={()=>setEd(null)} style={{position:"fixed",inset:0,background:"rgba(3,6,9,0.9)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+            <div className="brk-zoom" onClick={e=>e.stopPropagation()} style={{width:"100%",maxWidth:430,background:T.bg,borderRadius:18,padding:16,maxHeight:"92vh",overflowY:"auto",border:`1px solid ${T.border}`,boxShadow:"0 24px 70px rgba(0,0,0,0.65)"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+                <div style={{color:T.gold,fontWeight:800,fontFamily:"'Barlow Condensed',sans-serif",fontSize:21,letterSpacing:1}}>⚙️ {ed.round}</div>
+                <button onClick={()=>setEd(null)} style={{background:T.card2,color:T.text,border:`1px solid ${T.border}`,borderRadius:"50%",width:32,height:32,fontSize:15,cursor:"pointer",lineHeight:1,flexShrink:0}}>✕</button>
+              </div>
+              <div style={{fontSize:11,color:T.muted,marginBottom:5,fontWeight:700}}>ÉQUIPES</div>
+              <div style={{display:"flex",gap:6,marginBottom:12}}>
+                <select value={ed.teamH} onChange={e=>setEd(p=>({...p,teamH:e.target.value}))} style={{flex:1,minWidth:0,background:"#111b2d",border:`1px solid ${T.border}`,borderRadius:8,padding:"8px",color:"#fff",fontSize:13,outline:"none",fontFamily:"Inter,sans-serif"}}><option value="">— domicile —</option>{ALL_TEAMS.map(t=><option key={t} value={t}>{t}</option>)}</select>
+                <select value={ed.teamA} onChange={e=>setEd(p=>({...p,teamA:e.target.value}))} style={{flex:1,minWidth:0,background:"#111b2d",border:`1px solid ${T.border}`,borderRadius:8,padding:"8px",color:"#fff",fontSize:13,outline:"none",fontFamily:"Inter,sans-serif"}}><option value="">— extérieur —</option>{ALL_TEAMS.map(t=><option key={t} value={t}>{t}</option>)}</select>
+              </div>
+              <div style={{borderTop:`1px solid ${T.border}`,paddingTop:10}}>
+                <div style={{fontSize:10,color:T.green,textAlign:"center",marginBottom:8,fontWeight:700}}>SCORE À 90 MIN (compte pour les points)</div>
+                {row("Score 90 min","h","a",T.green)}
+                <div style={{fontSize:9.5,color:T.muted,textAlign:"center",margin:"4px 0 8px"}}>Optionnel — pour faire avancer le bon vainqueur :</div>
+                {row("⚡ Après prolong.","etH","etA","#a78bfa")}
+                {row("⚽ Tirs au but","penH","penA","#fbbf24")}
+              </div>
+              <div style={{display:"flex",alignItems:"center",gap:6,margin:"6px 0 12px"}}>
+                <span style={{fontSize:12,color:T.muted}}>📅</span>
+                <input type="datetime-local" value={isoToLocalInput(ed.m.date||SCHEDULE[ed.m.id])} onChange={e=>{const v=e.target.value; onSetDate(ed.round, ed.m.id, v?new Date(v).toISOString():"");}} style={{flex:1,background:"#111b2d",border:`1px solid ${T.border}`,borderRadius:8,padding:"7px 10px",color:"#fff",fontSize:13,outline:"none",colorScheme:"dark",fontFamily:"Inter,sans-serif"}}/>
+              </div>
+              <div style={{display:"flex",gap:8}}>
+                <button onClick={save} style={{flex:1,background:T.green,color:"#031208",border:"none",borderRadius:10,padding:"11px",fontWeight:800,fontSize:14,cursor:"pointer",fontFamily:"Inter,sans-serif"}}>💾 Enregistrer</button>
+                <button onClick={()=>{if(confirm(`Retirer ce match du tableau ?`)){onRemoveMatch(ed.round,ed.m.id);setEd(null);}}} style={{background:"#2a1418",color:T.red,border:`1px solid ${T.red}55`,borderRadius:10,padding:"11px 14px",fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:"Inter,sans-serif",flexShrink:0}}>🗑️</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
 
 function KoPage({preds,results,koMatches,settings,activeRound,setActiveRound,onChangePred,schedule,liveData}){
-  if(settings.phase==="groups") return(
+  const hasAnyKo = KO_ROUNDS.some(r => (koMatches?.[r]?.length>0));
+  if(settings.phase==="groups" && !hasAnyKo) return(
     <div style={{paddingTop:20}}>
       <PageTitle>PHASE FINALE</PageTitle>
       <div style={{background:T.card,borderRadius:16,padding:40,textAlign:"center",border:`1px solid ${T.border}`}}>
@@ -2637,6 +2690,12 @@ function App(){
   };
   const updateKoMatchDate=async(round,id,date)=>{
     const updated={...koMatches,[round]:(koMatches[round]||[]).map(m=>m.id===id?{...m,date}:m)};
+    setKoMatches(updated);await ss("koMatches",updated);
+  };
+  const updateKoMatchTeams=async(round,id,h,a)=>{
+    const list=koMatches[round]||[];
+    const arr = list.some(m=>m&&m.id===id) ? list.map(m=>m&&m.id===id?{...m,h,a}:m) : [...list,{id,h,a}];
+    const updated={...koMatches,[round]:arr};
     setKoMatches(updated);await ss("koMatches",updated);
   };
   const removeKoMatch=async(round,id)=>{
