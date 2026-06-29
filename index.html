@@ -981,23 +981,22 @@ function koPosFromId(id){ const m=(id||"").match(/KO[A-Za-z]+(\d+)/); return m?(
 // Fait avancer automatiquement le vainqueur (et le perdant des demies vers la petite finale)
 function koAdvance(koMatches, round, matchId, result){
   const list = koMatches[round]||[];
-  const m = list.find(x=>x && x.id===matchId);
-  if(!m) return koMatches;
+  const idx = list.findIndex(x=>x && x.id===matchId); // position = index dans le tableau du tour
+  if(idx<0) return koMatches;
+  const m = list[idx];
   const side = koWinnerSide(result);
   if(!side) return koMatches; // nul sans départage -> on n'avance pas
   const winner = side==="h"?m.h:m.a;
   const loser  = side==="h"?m.a:m.h;
   if(!winner) return koMatches;
-  const pos = koPosFromId(matchId);
-  const targetIdx = Math.floor(pos/2);
-  const slot = pos%2===0 ? "h" : "a";
+  const targetIdx = Math.floor(idx/2);
+  const slot = idx%2===0 ? "h" : "a";
   let updated = {...koMatches};
   const place=(nextRound, team)=>{
-    const id = `KO${KO_PREFIX[nextRound]}${targetIdx+1}`;
     const arr = [...(updated[nextRound]||[])];
-    const ei = arr.findIndex(x=>x && x.id===id);
-    if(ei>=0) arr[ei] = {...arr[ei], [slot]: team};
-    else arr.push({id, h: slot==="h"?team:"", a: slot==="a"?team:""});
+    // S'assurer qu'une case existe à la bonne position (remplir les trous avec des cases vides)
+    while(arr.length <= targetIdx) arr.push({id:`KO${KO_PREFIX[nextRound]}${arr.length+1}`, h:"", a:""});
+    arr[targetIdx] = {...arr[targetIdx], [slot]: team};
     updated[nextRound] = arr;
   };
   const nextR = NEXT_ROUND[round];
@@ -1023,8 +1022,8 @@ function BracketView({preds,results,koMatches,onChangePred,schedule,liveData}){
 
   const Cell=({round,i})=>{
     const list=koMatches?.[round]||[];
-    const id=koId(round,i);
-    const m=list.find(x=>x && x.id===id);
+    const m=list[i];
+    const id=m?.id||koId(round,i);
     const bothKnown=!!(m && m.h && m.a);
     const date=m?.date||schedule?.[id];
     const pred=m?(preds.ko?.[m.id]||{}):null;
@@ -1990,7 +1989,7 @@ function AdminPage({results,settings,koMatches,players,saveResult,deleteResult,s
               <button onClick={()=>{if(newH&&newA&&newH!==newA){addKoMatch(activeRound,newH,newA);setNewH("");setNewA("");}}} style={{background:T.blue,color:"#fff",border:"none",borderRadius:8,padding:"8px 16px",fontFamily:"Inter,sans-serif",fontWeight:600,fontSize:13,cursor:"pointer",flexShrink:0}}>Ajouter</button>
             </div>
           </div>
-          {(koMatches?.[activeRound]||[]).map(m=>(
+          {(koMatches?.[activeRound]||[]).filter(m=>m && (m.h||m.a)).map(m=>(
             <div key={m.id} style={{marginBottom:14}}>
               <RRow type="ko" id={m.id} home={m.h} away={m.a} ko={true}/>
               <div style={{display:"flex",alignItems:"stretch",gap:8,marginTop:6}}>
