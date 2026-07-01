@@ -640,31 +640,31 @@ const SCHEDULE = {
   "M71":"2026-06-27T17:00:00-04:00", // Angleterre vs Panama
   "M72":"2026-06-27T17:00:00-04:00", // Croatie vs Ghana
 
-  // ===== PHASE FINALE (heures en heure française CEST, +02:00) =====
-  // Seizièmes de finale (28 juin → 4 juillet) — IDs auto-générés KOSei1..KOSei16
-  "KOSei1":"2026-06-28T21:00:00+02:00",
-  "KOSei2":"2026-06-29T19:00:00+02:00",
-  "KOSei3":"2026-06-29T22:30:00+02:00",
-  "KOSei4":"2026-06-30T03:00:00+02:00",
-  "KOSei5":"2026-06-30T19:00:00+02:00",
-  "KOSei6":"2026-06-30T23:00:00+02:00",
-  "KOSei7":"2026-07-01T03:00:00+02:00",
-  "KOSei8":"2026-07-01T18:00:00+02:00",
-  "KOSei9":"2026-07-01T22:00:00+02:00",
-  "KOSei10":"2026-07-02T02:00:00+02:00",
-  "KOSei11":"2026-07-02T21:00:00+02:00",
-  "KOSei12":"2026-07-03T01:00:00+02:00",
-  "KOSei13":"2026-07-03T05:00:00+02:00",
-  "KOSei14":"2026-07-03T20:00:00+02:00",
-  "KOSei15":"2026-07-04T00:00:00+02:00",
-  "KOSei16":"2026-07-04T03:30:00+02:00",
-  // Huitièmes de finale (4 → 7 juillet) — KOHui1..KOHui8
-  "KOHui1":"2026-07-04T19:00:00+02:00",
-  "KOHui2":"2026-07-04T23:00:00+02:00",
-  "KOHui3":"2026-07-05T22:00:00+02:00",
-  "KOHui4":"2026-07-06T02:00:00+02:00",
-  "KOHui5":"2026-07-06T21:00:00+02:00",
-  "KOHui6":"2026-07-07T02:00:00+02:00",
+  // ===== PHASE FINALE (heures en heure française CEST, +02:00) — positions = image officielle =====
+  // Seizièmes — KOSei1..16 = positions du tableau (gauche 1-8 haut→bas, droite 9-16 haut→bas)
+  "KOSei1":"2026-06-29T22:30:00+02:00",  // Allemagne - Paraguay
+  "KOSei2":"2026-06-30T23:00:00+02:00",  // France - Suède
+  "KOSei3":"2026-06-28T21:00:00+02:00",  // Afrique du Sud - Canada
+  "KOSei4":"2026-06-30T03:00:00+02:00",  // Pays-Bas - Maroc
+  "KOSei5":"2026-07-03T01:00:00+02:00",  // Portugal - Croatie
+  "KOSei6":"2026-07-02T21:00:00+02:00",  // Espagne - Autriche
+  "KOSei7":"2026-07-02T02:00:00+02:00",  // États-Unis - Bosnie-Herzégovine
+  "KOSei8":"2026-07-01T22:00:00+02:00",  // Belgique - Sénégal
+  "KOSei9":"2026-06-29T19:00:00+02:00",  // Brésil - Japon
+  "KOSei10":"2026-06-30T19:00:00+02:00", // Côte d'Ivoire - Norvège
+  "KOSei11":"2026-07-01T03:00:00+02:00", // Mexique - Équateur
+  "KOSei12":"2026-07-01T18:00:00+02:00", // Angleterre - RD Congo
+  "KOSei13":"2026-07-04T00:00:00+02:00", // Argentine - Cap-Vert
+  "KOSei14":"2026-07-03T20:00:00+02:00", // Égypte - Australie
+  "KOSei15":"2026-07-03T05:00:00+02:00", // Suisse - Algérie
+  "KOSei16":"2026-07-04T03:30:00+02:00", // Colombie - Ghana
+  // Huitièmes — KOHui1..8 = positions
+  "KOHui1":"2026-07-04T23:00:00+02:00",
+  "KOHui2":"2026-07-04T19:00:00+02:00",
+  "KOHui3":"2026-07-06T21:00:00+02:00",
+  "KOHui4":"2026-07-07T02:00:00+02:00",
+  "KOHui5":"2026-07-05T22:00:00+02:00",
+  "KOHui6":"2026-07-06T02:00:00+02:00",
   "KOHui7":"2026-07-07T18:00:00+02:00",
   "KOHui8":"2026-07-07T22:00:00+02:00",
   // Quarts de finale (9 → 12 juillet) — KOQua1..KOQua4
@@ -966,6 +966,25 @@ function BonusPage({preds,settings,onChangeBonus}){
 }
 
 const KO_PREFIX = {"Seizièmes":"Sei","Huitièmes":"Hui","Quarts":"Qua","Demi-finales":"Dem","Petite finale":"Pet","Finale":"Fin"};
+// Tableau officiel des 16es de finale (image CDM 2026) — positions = ordre du tableau
+const KO_OFFICIEL = [
+  {id:"KOSei1",  h:"Allemagne",     a:"Paraguay"},
+  {id:"KOSei2",  h:"France",        a:"Suède"},
+  {id:"KOSei3",  h:"Afrique du Sud",a:"Canada"},
+  {id:"KOSei4",  h:"Pays-Bas",      a:"Maroc"},
+  {id:"KOSei5",  h:"Portugal",      a:"Croatie"},
+  {id:"KOSei6",  h:"Espagne",       a:"Autriche"},
+  {id:"KOSei7",  h:"États-Unis",    a:"Bosnie-Herzégovine"},
+  {id:"KOSei8",  h:"Belgique",      a:"Sénégal"},
+  {id:"KOSei9",  h:"Brésil",        a:"Japon"},
+  {id:"KOSei10", h:"Côte d'Ivoire", a:"Norvège"},
+  {id:"KOSei11", h:"Mexique",       a:"Équateur"},
+  {id:"KOSei12", h:"Angleterre",    a:"RD Congo"},
+  {id:"KOSei13", h:"Argentine",     a:"Cap-Vert"},
+  {id:"KOSei14", h:"Égypte",        a:"Australie"},
+  {id:"KOSei15", h:"Suisse",        a:"Algérie"},
+  {id:"KOSei16", h:"Colombie",      a:"Ghana"},
+];
 // Progression des vainqueurs d'un tour vers le suivant
 const NEXT_ROUND = {"Seizièmes":"Huitièmes","Huitièmes":"Quarts","Quarts":"Demi-finales","Demi-finales":"Finale"};
 // Vainqueur d'un match KO : 90 min, sinon prolongation, sinon tirs au but (renvoie "h"/"a"/null)
@@ -1840,7 +1859,7 @@ function QualificationsPanel({results,koMatches,addKoMatch}){
   );
 }
 
-function AdminPage({results,settings,koMatches,players,saveResult,deleteResult,saveSettings,addKoMatch,removeKoMatch,updateKoMatchDate,adminTab,setAdminTab,activeGroup,setActiveGroup,activeRound,setActiveRound,setResults,setPlayers,leaderboard,prevLeaderboard,loadLeaderboard}){
+function AdminPage({results,settings,koMatches,players,saveResult,deleteResult,saveSettings,addKoMatch,removeKoMatch,updateKoMatchDate,updateKoMatchTeams,loadOfficialBracket,liveData,adminTab,setAdminTab,activeGroup,setActiveGroup,activeRound,setActiveRound,setResults,setPlayers,leaderboard,prevLeaderboard,loadLeaderboard}){
   const[tmp,setTmp]=useState({});
   const[newH,setNewH]=useState("");
   const[newA,setNewA]=useState("");
@@ -2027,35 +2046,12 @@ function AdminPage({results,settings,koMatches,players,saveResult,deleteResult,s
           {/* ✨ Qualifications automatiques */}
           <QualificationsPanel results={results} koMatches={koMatches} addKoMatch={addKoMatch}/>
 
-          <TabBar tabs={KO_ROUNDS.map(r=>({id:r,label:r}))} active={activeRound} onSelect={setActiveRound}/>
-          <div style={{background:T.card2,borderRadius:12,padding:16,marginBottom:12,border:`1px solid ${T.border}`}}>
-            <div style={{fontWeight:600,fontSize:14,color:T.text,marginBottom:10}}>➕ Ajouter un match — {activeRound}</div>
-            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-              <select value={newH} onChange={e=>setNewH(e.target.value)} style={{flex:1,minWidth:130,background:"#111b2d",border:`1px solid ${T.border}`,borderRadius:8,padding:"8px 10px",color:newH?"#fff":T.muted,fontFamily:"Inter,sans-serif",fontSize:13,outline:"none"}}>
-                <option value="">Équipe domicile</option>
-                {ALL_TEAMS.map(t=><option key={t} value={t}>{F[t]||"🏳"} {t}</option>)}
-              </select>
-              <select value={newA} onChange={e=>setNewA(e.target.value)} style={{flex:1,minWidth:130,background:"#111b2d",border:`1px solid ${T.border}`,borderRadius:8,padding:"8px 10px",color:newA?"#fff":T.muted,fontFamily:"Inter,sans-serif",fontSize:13,outline:"none"}}>
-                <option value="">Équipe visiteur</option>
-                {ALL_TEAMS.map(t=><option key={t} value={t}>{F[t]||"🏳"} {t}</option>)}
-              </select>
-              <button onClick={()=>{if(newH&&newA&&newH!==newA){addKoMatch(activeRound,newH,newA);setNewH("");setNewA("");}}} style={{background:T.blue,color:"#fff",border:"none",borderRadius:8,padding:"8px 16px",fontFamily:"Inter,sans-serif",fontWeight:600,fontSize:13,cursor:"pointer",flexShrink:0}}>Ajouter</button>
-            </div>
-          </div>
-          {(koMatches?.[activeRound]||[]).filter(m=>m && (m.h||m.a)).map(m=>(
-            <div key={m.id} style={{marginBottom:14}}>
-              <RRow type="ko" id={m.id} home={m.h} away={m.a} ko={true}/>
-              <div style={{display:"flex",alignItems:"stretch",gap:8,marginTop:6}}>
-                <div style={{flex:1,display:"flex",alignItems:"center",gap:6,background:T.card,borderRadius:8,padding:"6px 10px",border:`1px solid ${(m.date||SCHEDULE[m.id])?T.blue+"55":T.border}`}}>
-                  <span style={{fontSize:12,color:T.muted,flexShrink:0}}>📅</span>
-                  <input type="datetime-local" value={isoToLocalInput(m.date||SCHEDULE[m.id])} onChange={e=>{const v=e.target.value; updateKoMatchDate(activeRound,m.id, v?new Date(v).toISOString():"");}} style={{flex:1,minWidth:0,background:"transparent",border:"none",color:"#fff",fontFamily:"Inter,sans-serif",fontSize:13,outline:"none",colorScheme:"dark"}}/>
-                </div>
-                <button onClick={()=>{if(confirm(`Retirer ce match du tableau ?\n${m.h||"?"} vs ${m.a||"?"}`)) removeKoMatch(activeRound,m.id);}} style={{background:"#2a1418",color:T.red,border:`1px solid ${T.red}55`,borderRadius:8,padding:"6px 12px",fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"Inter,sans-serif",flexShrink:0,display:"flex",alignItems:"center",gap:5}}>🗑️ Retirer</button>
-              </div>
-              {!(m.date||SCHEDULE[m.id])&&<div style={{fontSize:11,color:"#f97316",marginTop:6}}>⚠️ Sans date, le match ne se verrouillera pas automatiquement.</div>}
-            </div>
-          ))}
-          {!(koMatches?.[activeRound]?.length>0)&&<div style={{textAlign:"center",color:T.muted,padding:20,fontSize:14}}>Aucun match saisi pour ce tour.</div>}
+          {/* 📋 Charger le tableau officiel de l'image */}
+          <button onClick={()=>{if(confirm("Charger le tableau officiel des 16es de finale (image CDM 2026) ?\n\nCela remplace les seizièmes par les 16 affiches exactes et réinitialise les tours suivants (qui se rempliront automatiquement avec les vainqueurs).\n\nLes pronostics des participants ne sont PAS effacés."))loadOfficialBracket();}} style={{width:"100%",background:"linear-gradient(135deg,#b45309,#f59e0b)",color:"#1a1205",border:"none",borderRadius:12,padding:"13px",fontWeight:800,fontSize:14.5,cursor:"pointer",fontFamily:"Inter,sans-serif",marginBottom:14,boxShadow:"0 4px 14px rgba(245,158,11,0.3)"}}>📋 Charger le tableau officiel des 16es (image)</button>
+
+          {/* 🌳 Arbre interactif (admin) */}
+          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:700,color:T.gold,margin:"4px 0 4px"}}>🌳 Tableau de la phase finale</div>
+          <BracketView preds={{}} results={results} koMatches={koMatches} onChangePred={()=>{}} schedule={SCHEDULE} liveData={liveData||[]} admin={true} onSaveResult={saveResult} onSetDate={updateKoMatchDate} onSetTeams={updateKoMatchTeams} onRemoveMatch={removeKoMatch}/>
         </div>
       )}
 
@@ -2698,6 +2694,11 @@ function App(){
     const updated={...koMatches,[round]:arr};
     setKoMatches(updated);await ss("koMatches",updated);
   };
+  const loadOfficialBracket=async()=>{
+    const sei = KO_OFFICIEL.map(m=>({...m, date: SCHEDULE[m.id]||""}));
+    const updated = {...koMatches, "Seizièmes":sei, "Huitièmes":[], "Quarts":[], "Demi-finales":[], "Petite finale":[], "Finale":[]};
+    setKoMatches(updated); await ss("koMatches", updated);
+  };
   const removeKoMatch=async(round,id)=>{
     const updated={...koMatches,[round]:(koMatches[round]||[]).filter(m=>m.id!==id)};
     setKoMatches(updated);await ss("koMatches",updated);
@@ -2903,7 +2904,7 @@ function App(){
             )}
           </div>
         )}
-        {page==="admin"&&<AdminPage results={results} settings={settings} koMatches={koMatches} players={players} saveResult={saveResult} deleteResult={deleteResult} saveSettings={saveSettings} addKoMatch={addKoMatch} removeKoMatch={removeKoMatch} updateKoMatchDate={updateKoMatchDate} adminTab={adminTab} setAdminTab={setAdminTab} activeGroup={activeGroup} setActiveGroup={setActiveGroup} activeRound={activeRound} setActiveRound={setActiveRound} setResults={setResults} setPlayers={setPlayers} leaderboard={leaderboard} prevLeaderboard={prevLeaderboard} loadLeaderboard={loadLeaderboard}/>}
+        {page==="admin"&&<AdminPage results={results} settings={settings} koMatches={koMatches} players={players} saveResult={saveResult} deleteResult={deleteResult} saveSettings={saveSettings} addKoMatch={addKoMatch} removeKoMatch={removeKoMatch} updateKoMatchDate={updateKoMatchDate} updateKoMatchTeams={updateKoMatchTeams} loadOfficialBracket={loadOfficialBracket} liveData={liveData} adminTab={adminTab} setAdminTab={setAdminTab} activeGroup={activeGroup} setActiveGroup={setActiveGroup} activeRound={activeRound} setActiveRound={setActiveRound} setResults={setResults} setPlayers={setPlayers} leaderboard={leaderboard} prevLeaderboard={prevLeaderboard} loadLeaderboard={loadLeaderboard}/>}
       </div>
 
       {/* Barre de navigation bas — style Instagram */}
