@@ -1274,7 +1274,8 @@ function LeaderboardPage({leaderboard,prevLeaderboard,loading,myPseudo,onRefresh
     return da-db;
   };
   const lockedGrpMatches=GM.filter(m=>isMatchLocked(schedule?.[m.id])).sort(byDate);
-  const lockedKoMatches=KO_ROUNDS.flatMap(r=>(koMatches?.[r]||[]).filter(m=>isMatchLocked(schedule?.[m.id]))).sort(byDate);
+  // Ordre du tableau (tour puis position) — contrôlé par l'admin via l'échange de cases, PAS par la date
+  const lockedKoMatches=KO_ROUNDS.flatMap(r=>(koMatches?.[r]||[]).filter(m=>m&&isMatchLocked(schedule?.[m.id])));
   const hasLocked=lockedGrpMatches.length>0||lockedKoMatches.length>0;
 
   const fmtMatchDate=(iso)=>{
@@ -1931,6 +1932,7 @@ function AdminPage({results,settings,koMatches,players,saveResult,deleteResult,s
   const[remapMsg,setRemapMsg]=useState("");
   const[remapBusy,setRemapBusy]=useState(false);
   const[folderList,setFolderList]=useState(null);
+  const[koSwapSel,setKoSwapSel]=useState(null); // échange dans la liste de saisie -> {round, idx}
 
   const getV=(type,id,field)=>{const k=`${type}_${id}_${field}`;return k in tmp?tmp[k]:(results[type]?.[id]?.[field]??"");};
   const setV=(type,id,field,v)=>setTmp(p=>({...p,[`${type}_${id}_${field}`]:v}));
@@ -2207,20 +2209,37 @@ function AdminPage({results,settings,koMatches,players,saveResult,deleteResult,s
           <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:700,color:T.gold,margin:"4px 0 4px"}}>🌳 Tableau de la phase finale</div>
           <BracketView preds={{}} results={results} koMatches={koMatches} onChangePred={()=>{}} schedule={SCHEDULE} liveData={liveData||[]} admin={true} onSaveResult={saveResult} onClearResult={(round,id)=>deleteResult("ko",id)} onSetDate={updateKoMatchDate} onSetTeams={updateKoMatchTeams} onSetUnlock={updateKoMatchUnlock} onRemoveMatch={removeKoMatch} onSwap={swapKoMatches}/>
 
-          {/* 📝 Saisie simple des résultats (liste à plat, sans onglets) */}
+          {/* 📝 Saisie simple des résultats (par tour, dans l'ordre du tableau) */}
           <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:700,color:T.text,margin:"20px 0 4px"}}>📝 Saisie des résultats</div>
-          <div style={{fontSize:12,color:T.muted,marginBottom:12,lineHeight:1.5}}>Entrez le score à 90 min de chaque match ici — le vainqueur avance tout seul dans le tableau. (Vous pouvez aussi toucher un match directement dans l'arbre ci-dessus.)</div>
+          <div style={{fontSize:12,color:T.muted,marginBottom:8,lineHeight:1.5}}>Entrez le score à 90 min de chaque match — le vainqueur avance tout seul. Le bouton <b style={{color:T.gold}}>🔀</b> permet d'échanger deux matchs de place (l'ordre se répercute dans le classement).</div>
+          {koSwapSel&&<div style={{fontSize:11.5,color:T.green,marginBottom:8,textAlign:"center",fontWeight:600,background:"#0e1f1a",borderRadius:8,padding:"7px 10px",border:`1px solid ${T.green}55`}}>Match choisi. Touche le 🔀 d'un autre match du <b>même tour</b> pour échanger.</div>}
           {(()=>{
-            const allKo=[];
-            KO_ROUNDS.forEach(r=>(koMatches?.[r]||[]).forEach(m=>{if(m&&m.h&&m.a)allKo.push({...m,round:r});}));
-            allKo.sort((a,b)=>new Date(a.date||SCHEDULE[a.id]||0)-new Date(b.date||SCHEDULE[b.id]||0));
-            if(allKo.length===0) return <div style={{textAlign:"center",color:T.muted,padding:20,fontSize:14,background:T.card2,borderRadius:12,border:`1px solid ${T.border}`}}>Cliquez sur <b style={{color:T.gold}}>📋 Charger le tableau officiel</b> ci-dessus.<br/>Les matchs à saisir apparaîtront ici.</div>;
-            return allKo.map(m=>(
-              <div key={m.id} style={{marginBottom:12}}>
-                <div style={{fontSize:11,color:T.gold,fontWeight:700,marginBottom:3,letterSpacing:0.3}}>{m.round}</div>
-                <RRow type="ko" id={m.id} home={m.h} away={m.a} ko={true}/>
-              </div>
-            ));
+            const anyKo=KO_ROUNDS.some(r=>(koMatches?.[r]||[]).some(m=>m&&m.h&&m.a));
+            if(!anyKo) return <div style={{textAlign:"center",color:T.muted,padding:20,fontSize:14,background:T.card2,borderRadius:12,border:`1px solid ${T.border}`}}>Cliquez sur <b style={{color:T.gold}}>📋 Charger le tableau officiel</b> ci-dessus.<br/>Les matchs à saisir apparaîtront ici.</div>;
+            return KO_ROUNDS.map(r=>{
+              const arr=koMatches?.[r]||[];
+              const rows=arr.map((m,idx)=>({m,idx})).filter(x=>x.m&&x.m.h&&x.m.a);
+              if(rows.length===0) return null;
+              return (
+                <div key={r} style={{marginBottom:14}}>
+                  <div style={{fontSize:11,color:T.gold,fontWeight:700,marginBottom:5,letterSpacing:0.3}}>{r}</div>
+                  {rows.map(({m,idx})=>{
+                    const isSel=koSwapSel&&koSwapSel.round===r&&koSwapSel.idx===idx;
+                    return (
+                      <div key={m.id} style={{display:"flex",gap:6,alignItems:"stretch",marginBottom:6}}>
+                        <button onClick={()=>{
+                          if(!koSwapSel){ setKoSwapSel({round:r,idx}); return; }
+                          if(koSwapSel.round===r&&koSwapSel.idx===idx){ setKoSwapSel(null); return; }
+                          if(koSwapSel.round!==r){ setKoSwapSel({round:r,idx}); return; }
+                          swapKoMatches(r,koSwapSel.idx,idx); setKoSwapSel(null);
+                        }} title="Échanger de place" style={{flexShrink:0,width:44,background:isSel?T.green:"#2a1f14",color:isSel?"#031208":T.gold,border:`1px solid ${isSel?T.green:T.gold+"55"}`,borderRadius:10,fontSize:isSel?10:16,fontWeight:800,cursor:"pointer",fontFamily:"Inter,sans-serif",lineHeight:1.1,padding:"0 2px"}}>{isSel?"choisi":"🔀"}</button>
+                        <div style={{flex:1,minWidth:0}}><RRow type="ko" id={m.id} home={m.h} away={m.a} ko={true}/></div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            });
           })()}
         </div>
       )}
