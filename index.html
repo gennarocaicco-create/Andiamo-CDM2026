@@ -1863,7 +1863,7 @@ function QualificationsPanel({results,koMatches,addKoMatch}){
   );
 }
 
-function AdminPage({results,settings,koMatches,players,saveResult,deleteResult,saveSettings,addKoMatch,removeKoMatch,updateKoMatchDate,updateKoMatchTeams,updateKoMatchUnlock,loadOfficialBracket,remapSeiziemesPreds,restorePredsBackup,redoPreds,mergeAllPreds,revertMerge,analyzeFolders,liveData,adminTab,setAdminTab,activeGroup,setActiveGroup,activeRound,setActiveRound,setResults,setPlayers,leaderboard,prevLeaderboard,loadLeaderboard}){
+function AdminPage({results,settings,koMatches,players,saveResult,deleteResult,saveSettings,addKoMatch,removeKoMatch,updateKoMatchDate,updateKoMatchTeams,updateKoMatchUnlock,loadOfficialBracket,remapSeiziemesPreds,restorePredsBackup,redoPreds,mergeAllPreds,revertMerge,analyzeFolders,restoreKoFrom,undoKoRestore,liveData,adminTab,setAdminTab,activeGroup,setActiveGroup,activeRound,setActiveRound,setResults,setPlayers,leaderboard,prevLeaderboard,loadLeaderboard}){
   const[tmp,setTmp]=useState({});
   const[newH,setNewH]=useState("");
   const[newA,setNewA]=useState("");
@@ -1874,6 +1874,7 @@ function AdminPage({results,settings,koMatches,players,saveResult,deleteResult,s
   const[syncMsg,setSyncMsg]=useState("");
   const[remapMsg,setRemapMsg]=useState("");
   const[remapBusy,setRemapBusy]=useState(false);
+  const[folderList,setFolderList]=useState(null);
 
   const getV=(type,id,field)=>{const k=`${type}_${id}_${field}`;return k in tmp?tmp[k]:(results[type]?.[id]?.[field]??"");};
   const setV=(type,id,field,v)=>setTmp(p=>({...p,[`${type}_${id}_${field}`]:v}));
@@ -2058,12 +2059,30 @@ function AdminPage({results,settings,koMatches,players,saveResult,deleteResult,s
           {/* 🔁 Récupérer TOUS les scores (fusion des 3 sources) */}
           <div style={{background:"#0e1f1a",borderRadius:12,padding:14,marginBottom:14,border:`1px solid ${T.green}55`}}>
             <div style={{fontWeight:800,fontSize:14,color:T.green,marginBottom:6}}>🔁 Récupérer TOUS les scores disparus</div>
+            <div style={{fontSize:12,color:T.muted,lineHeight:1.6,marginBottom:8}}>Les pronos <b>KO</b> abîmés sont dans un des dossiers. Analysez, repérez le dossier qui a le plus de scores <b>KO</b>, puis restaurez les KO depuis celui‑ci (poules et bonus ne bougent pas).</div>
             <button disabled={remapBusy} onClick={async()=>{
               setRemapBusy(true); setRemapMsg("Analyse des dossiers…");
-              try{ const rep=await analyzeFolders(); setRemapMsg("📊 Contenu de chaque dossier :\n"+rep); }
+              try{ const {text,folders}=await analyzeFolders(); setFolderList(folders); setRemapMsg("📊 Contenu de chaque dossier :\n"+text); }
               catch(e){ setRemapMsg("❌ Erreur : "+e.message); }
               setRemapBusy(false);
             }} style={{width:"100%",background:"transparent",color:T.green,border:`1px solid ${T.green}66`,borderRadius:10,padding:"10px",fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:"Inter,sans-serif",marginBottom:10}}>🔍 Analyser tous les dossiers (voir où sont les scores)</button>
+            {folderList&&folderList.length>0&&<div style={{marginBottom:10}}>
+              <div style={{fontSize:12,color:T.text,fontWeight:700,marginBottom:6}}>📥 Restaurer les pronos KO depuis :</div>
+              {folderList.map(f=><button key={f.name} disabled={remapBusy||f.ko===0} onClick={async()=>{
+                if(!confirm(`Restaurer les pronos KO de TOUS les participants depuis "${f.name}" (${f.ko} scores KO) ?\n\nLes poules et les bonus ne sont pas touchés.\nUne sauvegarde est faite avant (Annuler dispo).`)) return;
+                setRemapBusy(true); setRemapMsg(`Restauration KO depuis ${f.name}…`);
+                try{ const r=await restoreKoFrom(f.name); setRemapMsg(`✅ KO restaurés depuis "${f.name}" : ${r.scores} scores sur ${r.players} participant(s). Vérifiez le bracket et le classement.`); }
+                catch(e){ setRemapMsg("❌ Erreur : "+e.message); }
+                setRemapBusy(false);
+              }} style={{display:"block",width:"100%",textAlign:"left",background:f.ko===0?T.card2:"#123",color:f.ko===0?T.muted:"#fff",border:`1px solid ${T.border}`,borderRadius:9,padding:"9px 11px",fontWeight:600,fontSize:12.5,cursor:f.ko===0?"default":"pointer",fontFamily:"Inter,sans-serif",marginBottom:6}}>{f.name} — <b style={{color:f.ko>0?T.green:T.muted}}>{f.ko} scores KO</b> ({f.pl} joueurs)</button>)}
+              <button disabled={remapBusy} onClick={async()=>{
+                if(!confirm("Annuler la dernière restauration KO ?")) return;
+                setRemapBusy(true); setRemapMsg("Annulation…");
+                try{ const n=await undoKoRestore(); setRemapMsg(n<0?"⚠️ Rien à annuler.":`↩️ Restauration KO annulée pour ${n} participant(s).`); }
+                catch(e){ setRemapMsg("❌ Erreur : "+e.message); }
+                setRemapBusy(false);
+              }} style={{width:"100%",background:"transparent",color:T.muted,border:`1px solid ${T.border}`,borderRadius:9,padding:"8px",fontWeight:600,fontSize:12,cursor:"pointer",fontFamily:"Inter,sans-serif"}}>↩️ Annuler la restauration KO</button>
+            </div>}
             <div style={{fontSize:12,color:T.muted,lineHeight:1.6,marginBottom:10}}>Fusionne <b>predictions</b> + <b>predictions_backup</b> + <b>predictions_redo</b> pour ne perdre aucun prono. Si des scores <b>diffèrent</b> entre les sources, choisissez qui gagne :</div>
             <button disabled={remapBusy} onClick={async()=>{
               if(!confirm("Fusion — priorité aux SAUVEGARDES.\n\nQuand un score diffère entre les sources, on prend celui des sauvegardes (backup/redo). C'est le bon choix si vos scores ont été abîmés dans predictions.\n\nUne sauvegarde est faite avant.")) return;
@@ -2825,9 +2844,37 @@ function App(){
   // 🔍 Analyse : lit TOUS les dossiers predictions* et compte les scores dans chacun.
   const analyzeFolders=async()=>{
     const root=(await sg("",{}))||{};
-    const folders=Object.keys(root).filter(k=>/^predictions/.test(k)).sort();
-    const count=(obj)=>{ let pl=0,sc=0; for(const p of Object.keys(obj||{})){ pl++; const pd=obj[p]||{}; for(const cat of ["grp","ko","bonus"]) sc+=Object.keys(pd[cat]||{}).length; } return {pl,sc}; };
-    return folders.map(f=>{ const s=count(root[f]); return `• ${f} : ${s.pl} joueurs, ${s.sc} scores`; }).join("\n") || "Aucun dossier predictions trouvé.";
+    const names=Object.keys(root).filter(k=>/^predictions/.test(k)).sort();
+    const folders=names.map(f=>{
+      const obj=root[f]||{}; let pl=0,grp=0,ko=0,bonus=0;
+      for(const p of Object.keys(obj)){ pl++; const pd=obj[p]||{}; grp+=Object.keys(pd.grp||{}).length; ko+=Object.keys(pd.ko||{}).length; bonus+=Object.keys(pd.bonus||{}).length; }
+      return {name:f, pl, grp, ko, bonus};
+    });
+    const text=folders.map(f=>`• ${f.name} : ${f.pl} joueurs — poules ${f.grp}, KO ${f.ko}, bonus ${f.bonus}`).join("\n") || "Aucun dossier.";
+    return {text, folders};
+  };
+  // 📥 Restaure UNIQUEMENT les pronos KO depuis un dossier choisi (poules/bonus intacts, ordre cohérent).
+  const restoreKoFrom=async(folder)=>{
+    const root=(await sg("",{}))||{};
+    const src=root[folder]||{};
+    const cur=root["predictions"]||{};
+    await ss("predictions_beforekorestore", JSON.parse(JSON.stringify(cur))); // filet de sécurité
+    const players=new Set([...Object.keys(src),...Object.keys(cur),...Object.keys(root["players"]||{})]);
+    let n=0, scores=0;
+    for(const p of players){
+      const ko=(src[p]||{}).ko||{};
+      if(Object.keys(ko).length===0) continue; // ne pas écraser par du vide
+      await ss(`predictions/${p}/ko`, ko);
+      n++; scores+=Object.keys(ko).length;
+    }
+    return {players:n, scores};
+  };
+  const undoKoRestore=async()=>{
+    const before=await sg("predictions_beforekorestore",null);
+    if(!before) return -1;
+    let n=0;
+    for(const p of Object.keys(before)){ const ko=(before[p]||{}).ko||{}; await ss(`predictions/${p}/ko`, ko); n++; }
+    return n;
   };
   // 🔁 Fusionne TOUS les dossiers predictions* (predictions, backup, redo, beforemerge, etc.).
   const mergeAllPreds=async(priority="current")=>{
@@ -3079,7 +3126,7 @@ function App(){
             )}
           </div>
         )}
-        {page==="admin"&&<AdminPage results={results} settings={settings} koMatches={koMatches} players={players} saveResult={saveResult} deleteResult={deleteResult} saveSettings={saveSettings} addKoMatch={addKoMatch} removeKoMatch={removeKoMatch} updateKoMatchDate={updateKoMatchDate} updateKoMatchTeams={updateKoMatchTeams} updateKoMatchUnlock={updateKoMatchUnlock} loadOfficialBracket={loadOfficialBracket} remapSeiziemesPreds={remapSeiziemesPreds} restorePredsBackup={restorePredsBackup} redoPreds={redoPreds} mergeAllPreds={mergeAllPreds} revertMerge={revertMerge} analyzeFolders={analyzeFolders} liveData={liveData} adminTab={adminTab} setAdminTab={setAdminTab} activeGroup={activeGroup} setActiveGroup={setActiveGroup} activeRound={activeRound} setActiveRound={setActiveRound} setResults={setResults} setPlayers={setPlayers} leaderboard={leaderboard} prevLeaderboard={prevLeaderboard} loadLeaderboard={loadLeaderboard}/>}
+        {page==="admin"&&<AdminPage results={results} settings={settings} koMatches={koMatches} players={players} saveResult={saveResult} deleteResult={deleteResult} saveSettings={saveSettings} addKoMatch={addKoMatch} removeKoMatch={removeKoMatch} updateKoMatchDate={updateKoMatchDate} updateKoMatchTeams={updateKoMatchTeams} updateKoMatchUnlock={updateKoMatchUnlock} loadOfficialBracket={loadOfficialBracket} remapSeiziemesPreds={remapSeiziemesPreds} restorePredsBackup={restorePredsBackup} redoPreds={redoPreds} mergeAllPreds={mergeAllPreds} revertMerge={revertMerge} analyzeFolders={analyzeFolders} restoreKoFrom={restoreKoFrom} undoKoRestore={undoKoRestore} liveData={liveData} adminTab={adminTab} setAdminTab={setAdminTab} activeGroup={activeGroup} setActiveGroup={setActiveGroup} activeRound={activeRound} setActiveRound={setActiveRound} setResults={setResults} setPlayers={setPlayers} leaderboard={leaderboard} prevLeaderboard={prevLeaderboard} loadLeaderboard={loadLeaderboard}/>}
       </div>
 
       {/* Barre de navigation bas — style Instagram */}
