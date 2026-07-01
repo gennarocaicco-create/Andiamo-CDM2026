@@ -1052,10 +1052,24 @@ function koUnadvance(koMatches, round, matchId, prevResult){
 }
 
 // Arbre interactif de la phase finale (tout le tableau d'un coup, façon FIFA)
-function BracketView({preds,results,koMatches,onChangePred,schedule,liveData,admin,onSaveResult,onClearResult,onSetDate,onSetTeams,onSetUnlock,onRemoveMatch}){
+function BracketView({preds,results,koMatches,onChangePred,schedule,liveData,admin,onSaveResult,onClearResult,onSetDate,onSetTeams,onSetUnlock,onRemoveMatch,onSwap}){
   const [sel,setSel]=useState(null); // match sélectionné (mode joueur) -> {round, m}
   const [ed,setEd]=useState(null); // édition admin -> {round, m, ...champs}
+  const [swapMode,setSwapMode]=useState(false); // mode échange de cases (admin)
+  const [swapSel,setSwapSel]=useState(null); // 1ère case choisie -> {round, i, id}
   const koId=(round,i)=>`KO${KO_PREFIX[round]}${i+1}`;
+  const tapCell=(round,m,i)=>{
+    if(admin&&swapMode){
+      if(!m) return;
+      if(!swapSel){ setSwapSel({round,i,id:m.id}); return; }
+      if(swapSel.round===round&&swapSel.i===i){ setSwapSel(null); return; } // re-tap = désélection
+      if(swapSel.round!==round){ setSwapSel({round,i,id:m.id}); return; } // autre tour = nouvelle sélection
+      onSwap&&onSwap(round,swapSel.i,i);
+      setSwapSel(null);
+      return;
+    }
+    openMatch(round,m);
+  };
   const openMatch=(round,m)=>{
     if(admin){
       const r=results.ko?.[m.id]||{};
@@ -1094,9 +1108,12 @@ function BracketView({preds,results,koMatches,onChangePred,schedule,liveData,adm
     const wL=winSide===(flip?"a":"h"), wR=winSide===(flip?"h":"a");
     const decidedBy=result?(result.penH!=null?"t.a.b.":result.etH!=null?"a.p.":null):null;
     const canTap = admin ? !!m : bothKnown;
+    const isSwapSel = admin&&swapMode&&swapSel&&swapSel.round===round&&swapSel.i===i;
+    const swapArmed = admin&&swapMode&&!!m;
     return (
-      <button onClick={()=>canTap&&openMatch(round,m)} disabled={!canTap}
-        style={{width:"100%",textAlign:"left",background:m?T.card:"#0a0f17",border:`1.5px solid ${bc}`,borderRadius:9,padding:"5px 7px",cursor:canTap?"pointer":"default",opacity:canTap?1:0.5,position:"relative",fontFamily:"Inter,sans-serif",transition:"transform 0.1s"}}>
+      <button onClick={()=>canTap&&tapCell(round,m,i)} disabled={!canTap}
+        style={{width:"100%",textAlign:"left",background:isSwapSel?"#1a2f22":(m?T.card:"#0a0f17"),border:`${isSwapSel?2.5:1.5}px solid ${isSwapSel?T.green:swapArmed?T.gold+"99":bc}`,borderRadius:9,padding:"5px 7px",cursor:canTap?"pointer":"default",opacity:canTap?1:0.5,position:"relative",fontFamily:"Inter,sans-serif",transition:"transform 0.1s",boxShadow:isSwapSel?`0 0 0 3px ${T.green}33`:"none"}}>
+        {isSwapSel&&<div style={{position:"absolute",top:-8,left:-6,background:T.green,color:"#031208",fontSize:9,fontWeight:800,borderRadius:6,padding:"1px 5px",zIndex:2}}>🔀 choisie</div>}
         {(date||decidedBy)&&<div style={{fontSize:8,color:live?.isLive?"#22c55e":decidedBy?"#a78bfa":T.muted,marginBottom:3,fontWeight:600,letterSpacing:0.2,textAlign:"center"}}>{live?.isLive?"🔴 ":""}{fmtC(date)}{decidedBy?` · ${decidedBy}`:""}</div>}
         <TeamLine flag={F[lT]} name={shortT(lT)} score={hasPred?pH:""} win={wL}/>
         <div style={{height:3}}/>
@@ -1115,6 +1132,10 @@ function BracketView({preds,results,koMatches,onChangePred,schedule,liveData,adm
 
   return (
     <div>
+      {admin&&<div style={{marginBottom:8,padding:"0 8px"}}>
+        <button onClick={()=>{setSwapMode(s=>!s);setSwapSel(null);}} style={{width:"100%",background:swapMode?T.green:"transparent",color:swapMode?"#031208":T.gold,border:`1px solid ${swapMode?T.green:T.gold+"66"}`,borderRadius:10,padding:"10px",fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:"Inter,sans-serif"}}>{swapMode?"✅ Terminer le mode échange":"🔀 Échanger des cases de place"}</button>
+        {swapMode&&<div style={{fontSize:11.5,color:T.muted,lineHeight:1.5,marginTop:6,textAlign:"center"}}>{swapSel?"Touche une 2ᵉ case du MÊME tour pour échanger. Les pronos suivent automatiquement.":"Touche une 1ʳᵉ case, puis une 2ᵉ du même tour. Elles échangent de place, pronos inclus."}</div>}
+      </div>}
       <div style={{overflowX:"auto",overflowY:"hidden",WebkitOverflowScrolling:"touch",padding:"6px 0 10px",margin:"0 -16px",paddingLeft:8,paddingRight:8}}>
         <div style={{display:"flex",alignItems:"stretch",minHeight:580,width:"max-content"}}>
           <Col round="Seizièmes" from={0} to={8}/>
@@ -1898,7 +1919,7 @@ function QualificationsPanel({results,koMatches,addKoMatch}){
   );
 }
 
-function AdminPage({results,settings,koMatches,players,saveResult,deleteResult,saveSettings,addKoMatch,removeKoMatch,updateKoMatchDate,updateKoMatchTeams,updateKoMatchUnlock,loadOfficialBracket,remapSeiziemesPreds,restorePredsBackup,redoPreds,mergeAllPreds,revertMerge,analyzeFolders,restoreKoFrom,undoKoRestore,consolidateAll,removeBackupFolders,liveData,adminTab,setAdminTab,activeGroup,setActiveGroup,activeRound,setActiveRound,setResults,setPlayers,leaderboard,prevLeaderboard,loadLeaderboard}){
+function AdminPage({results,settings,koMatches,players,saveResult,deleteResult,saveSettings,addKoMatch,removeKoMatch,updateKoMatchDate,updateKoMatchTeams,updateKoMatchUnlock,swapKoMatches,loadOfficialBracket,remapSeiziemesPreds,restorePredsBackup,redoPreds,mergeAllPreds,revertMerge,analyzeFolders,restoreKoFrom,undoKoRestore,consolidateAll,removeBackupFolders,liveData,adminTab,setAdminTab,activeGroup,setActiveGroup,activeRound,setActiveRound,setResults,setPlayers,leaderboard,prevLeaderboard,loadLeaderboard}){
   const[tmp,setTmp]=useState({});
   const[newH,setNewH]=useState("");
   const[newA,setNewA]=useState("");
@@ -2184,7 +2205,7 @@ function AdminPage({results,settings,koMatches,players,saveResult,deleteResult,s
 
           {/* 🌳 Arbre interactif (admin) */}
           <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:700,color:T.gold,margin:"4px 0 4px"}}>🌳 Tableau de la phase finale</div>
-          <BracketView preds={{}} results={results} koMatches={koMatches} onChangePred={()=>{}} schedule={SCHEDULE} liveData={liveData||[]} admin={true} onSaveResult={saveResult} onClearResult={(round,id)=>deleteResult("ko",id)} onSetDate={updateKoMatchDate} onSetTeams={updateKoMatchTeams} onSetUnlock={updateKoMatchUnlock} onRemoveMatch={removeKoMatch}/>
+          <BracketView preds={{}} results={results} koMatches={koMatches} onChangePred={()=>{}} schedule={SCHEDULE} liveData={liveData||[]} admin={true} onSaveResult={saveResult} onClearResult={(round,id)=>deleteResult("ko",id)} onSetDate={updateKoMatchDate} onSetTeams={updateKoMatchTeams} onSetUnlock={updateKoMatchUnlock} onRemoveMatch={removeKoMatch} onSwap={swapKoMatches}/>
 
           {/* 📝 Saisie simple des résultats (liste à plat, sans onglets) */}
           <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:700,color:T.text,margin:"20px 0 4px"}}>📝 Saisie des résultats</div>
@@ -2847,6 +2868,14 @@ function App(){
     const updated={...koMatches,[round]:arr};
     setKoMatches(updated);await ss("koMatches",updated);
   };
+  // 🔀 Échange la place de deux cases du même tour (les IDs voyagent avec, donc pronos/résultats suivent)
+  const swapKoMatches=async(round,i,j)=>{
+    const arr=[...(koMatches[round]||[])];
+    if(i==null||j==null||i<0||j<0||i>=arr.length||j>=arr.length||i===j) return;
+    const t=arr[i]; arr[i]=arr[j]; arr[j]=t;
+    const updated={...koMatches,[round]:arr};
+    setKoMatches(updated);await ss("koMatches",updated);
+  };
   const updateKoMatchUnlock=async(round,id,unlocked)=>{
     const updated={...koMatches,[round]:(koMatches[round]||[]).map(m=>m&&m.id===id?{...m,unlocked}:m)};
     setKoMatches(updated);await ss("koMatches",updated);
@@ -3219,7 +3248,7 @@ function App(){
             )}
           </div>
         )}
-        {page==="admin"&&<AdminPage results={results} settings={settings} koMatches={koMatches} players={players} saveResult={saveResult} deleteResult={deleteResult} saveSettings={saveSettings} addKoMatch={addKoMatch} removeKoMatch={removeKoMatch} updateKoMatchDate={updateKoMatchDate} updateKoMatchTeams={updateKoMatchTeams} updateKoMatchUnlock={updateKoMatchUnlock} loadOfficialBracket={loadOfficialBracket} remapSeiziemesPreds={remapSeiziemesPreds} restorePredsBackup={restorePredsBackup} redoPreds={redoPreds} mergeAllPreds={mergeAllPreds} revertMerge={revertMerge} analyzeFolders={analyzeFolders} restoreKoFrom={restoreKoFrom} undoKoRestore={undoKoRestore} consolidateAll={consolidateAll} removeBackupFolders={removeBackupFolders} liveData={liveData} adminTab={adminTab} setAdminTab={setAdminTab} activeGroup={activeGroup} setActiveGroup={setActiveGroup} activeRound={activeRound} setActiveRound={setActiveRound} setResults={setResults} setPlayers={setPlayers} leaderboard={leaderboard} prevLeaderboard={prevLeaderboard} loadLeaderboard={loadLeaderboard}/>}
+        {page==="admin"&&<AdminPage results={results} settings={settings} koMatches={koMatches} players={players} saveResult={saveResult} deleteResult={deleteResult} saveSettings={saveSettings} addKoMatch={addKoMatch} removeKoMatch={removeKoMatch} updateKoMatchDate={updateKoMatchDate} updateKoMatchTeams={updateKoMatchTeams} updateKoMatchUnlock={updateKoMatchUnlock} swapKoMatches={swapKoMatches} loadOfficialBracket={loadOfficialBracket} remapSeiziemesPreds={remapSeiziemesPreds} restorePredsBackup={restorePredsBackup} redoPreds={redoPreds} mergeAllPreds={mergeAllPreds} revertMerge={revertMerge} analyzeFolders={analyzeFolders} restoreKoFrom={restoreKoFrom} undoKoRestore={undoKoRestore} consolidateAll={consolidateAll} removeBackupFolders={removeBackupFolders} liveData={liveData} adminTab={adminTab} setAdminTab={setAdminTab} activeGroup={activeGroup} setActiveGroup={setActiveGroup} activeRound={activeRound} setActiveRound={setActiveRound} setResults={setResults} setPlayers={setPlayers} leaderboard={leaderboard} prevLeaderboard={prevLeaderboard} loadLeaderboard={loadLeaderboard}/>}
       </div>
 
       {/* Barre de navigation bas — style Instagram */}
