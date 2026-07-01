@@ -1863,7 +1863,7 @@ function QualificationsPanel({results,koMatches,addKoMatch}){
   );
 }
 
-function AdminPage({results,settings,koMatches,players,saveResult,deleteResult,saveSettings,addKoMatch,removeKoMatch,updateKoMatchDate,updateKoMatchTeams,updateKoMatchUnlock,loadOfficialBracket,remapSeiziemesPreds,restorePredsBackup,redoPreds,mergeAllPreds,revertMerge,analyzeFolders,restoreKoFrom,undoKoRestore,liveData,adminTab,setAdminTab,activeGroup,setActiveGroup,activeRound,setActiveRound,setResults,setPlayers,leaderboard,prevLeaderboard,loadLeaderboard}){
+function AdminPage({results,settings,koMatches,players,saveResult,deleteResult,saveSettings,addKoMatch,removeKoMatch,updateKoMatchDate,updateKoMatchTeams,updateKoMatchUnlock,loadOfficialBracket,remapSeiziemesPreds,restorePredsBackup,redoPreds,mergeAllPreds,revertMerge,analyzeFolders,restoreKoFrom,undoKoRestore,consolidateAll,removeBackupFolders,liveData,adminTab,setAdminTab,activeGroup,setActiveGroup,activeRound,setActiveRound,setResults,setPlayers,leaderboard,prevLeaderboard,loadLeaderboard}){
   const[tmp,setTmp]=useState({});
   const[newH,setNewH]=useState("");
   const[newA,setNewA]=useState("");
@@ -2083,6 +2083,25 @@ function AdminPage({results,settings,koMatches,players,saveResult,deleteResult,s
                 setRemapBusy(false);
               }} style={{width:"100%",background:"transparent",color:T.muted,border:`1px solid ${T.border}`,borderRadius:9,padding:"8px",fontWeight:600,fontSize:12,cursor:"pointer",fontFamily:"Inter,sans-serif"}}>↩️ Annuler la restauration KO</button>
             </div>}
+            <div style={{borderTop:`1px solid ${T.border}`,marginTop:12,paddingTop:12}}>
+              <div style={{fontSize:12,color:T.text,fontWeight:700,marginBottom:4}}>🧹 Nettoyage final</div>
+              <div style={{fontSize:11.5,color:T.muted,lineHeight:1.6,marginBottom:8}}>1️⃣ Regroupe tout dans <b>predictions</b> (le dossier lu par l'app). 2️⃣ Vérifie le classement. 3️⃣ Supprime les sauvegardes. <b>Restaure d'abord les bons KO ci‑dessus si besoin.</b></div>
+              <button disabled={remapBusy} onClick={async()=>{
+                if(!confirm("Regrouper tous les pronos dans le dossier predictions ?\n\nLes pronos actuels de predictions sont gardés, on ajoute ceux qui manquent depuis les sauvegardes.")) return;
+                setRemapBusy(true); setRemapMsg("Regroupement…");
+                try{ const r=await consolidateAll(); setRemapMsg(`✅ Tout regroupé dans predictions : ${r.filled} prono(s) ajouté(s) sur ${r.players} participant(s). Vérifiez le classement AVANT de supprimer.`); }
+                catch(e){ setRemapMsg("❌ Erreur : "+e.message); }
+                setRemapBusy(false);
+              }} style={{width:"100%",background:remapBusy?T.card2:T.green,color:"#031208",border:"none",borderRadius:10,padding:"12px",fontWeight:800,fontSize:14,cursor:remapBusy?"default":"pointer",fontFamily:"Inter,sans-serif",marginBottom:8}}>{remapBusy?"⏳ Patientez…":"1️⃣ 🧹 Tout regrouper dans predictions"}</button>
+              <button disabled={remapBusy} onClick={async()=>{
+                if(!confirm("⚠️ SUPPRIMER TOUS les dossiers de sauvegarde ?\n\nCela efface predictions_backup, predictions_redo, etc. Seul predictions reste.\n\n❌ IRRÉVERSIBLE. Ne le faites QUE si le classement est correct.")) return;
+                if(!confirm("Dernière confirmation : supprimer définitivement toutes les sauvegardes ?")) return;
+                setRemapBusy(true); setRemapMsg("Suppression…");
+                try{ const names=await removeBackupFolders(); setFolderList(null); setRemapMsg(names.length?`🗑️ ${names.length} dossier(s) supprimé(s) : ${names.join(", ")}. Il ne reste que predictions.`:"Aucun dossier de sauvegarde à supprimer."); }
+                catch(e){ setRemapMsg("❌ Erreur : "+e.message); }
+                setRemapBusy(false);
+              }} style={{width:"100%",background:"transparent",color:T.danger||"#e66",border:`1px solid ${T.danger||"#e66"}66`,borderRadius:10,padding:"11px",fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:"Inter,sans-serif"}}>2️⃣ 🗑️ Supprimer tous les dossiers de sauvegarde</button>
+            </div>
             <div style={{fontSize:12,color:T.muted,lineHeight:1.6,marginBottom:10}}>Fusionne <b>predictions</b> + <b>predictions_backup</b> + <b>predictions_redo</b> pour ne perdre aucun prono. Si des scores <b>diffèrent</b> entre les sources, choisissez qui gagne :</div>
             <button disabled={remapBusy} onClick={async()=>{
               if(!confirm("Fusion — priorité aux SAUVEGARDES.\n\nQuand un score diffère entre les sources, on prend celui des sauvegardes (backup/redo). C'est le bon choix si vos scores ont été abîmés dans predictions.\n\nUne sauvegarde est faite avant.")) return;
@@ -2876,6 +2895,38 @@ function App(){
     for(const p of Object.keys(before)){ const ko=(before[p]||{}).ko||{}; await ss(`predictions/${p}/ko`, ko); n++; }
     return n;
   };
+  // 🧹 Regroupe TOUT dans predictions (union), predictions gagne les conflits (garde tes KO restaurés).
+  const consolidateAll=async()=>{
+    const root=(await sg("",{}))||{};
+    const folders=Object.keys(root).filter(k=>/^predictions/.test(k));
+    const cur=root["predictions"]||{};
+    const backups=folders.filter(f=>f!=="predictions");
+    const allPlayers=new Set();
+    for(const f of folders) for(const p of Object.keys(root[f]||{})) allPlayers.add(p);
+    for(const p of Object.keys(root["players"]||{})) allPlayers.add(p);
+    let filled=0, players=0;
+    for(const p of allPlayers){
+      const c=cur[p]||{};
+      const mg={grp:{},ko:{},bonus:{}};
+      for(const cat of ["grp","ko","bonus"]){
+        let acc={};
+        for(const f of backups){ acc={...acc, ...(((root[f]||{})[p]||{})[cat]||{})}; } // sauvegardes d'abord
+        acc={...acc, ...(c[cat]||{})}; // predictions gagne (garde tes KO actuels)
+        mg[cat]=acc;
+      }
+      for(const cat of ["grp","ko","bonus"]){ const cc=c[cat]||{}; for(const k of Object.keys(mg[cat])) if(cc[k]===undefined) filled++; }
+      await ss(`predictions/${p}`, mg);
+      players++;
+    }
+    return {filled, players};
+  };
+  // 🗑️ Supprime TOUS les dossiers predictions_* (garde uniquement predictions). Irréversible.
+  const removeBackupFolders=async()=>{
+    const root=(await sg("",{}))||{};
+    const names=Object.keys(root).filter(k=>/^predictions_/.test(k));
+    for(const f of names){ await dbRef(f).remove(); }
+    return names;
+  };
   // 🔁 Fusionne TOUS les dossiers predictions* (predictions, backup, redo, beforemerge, etc.).
   const mergeAllPreds=async(priority="current")=>{
     const root=(await sg("",{}))||{};
@@ -3126,7 +3177,7 @@ function App(){
             )}
           </div>
         )}
-        {page==="admin"&&<AdminPage results={results} settings={settings} koMatches={koMatches} players={players} saveResult={saveResult} deleteResult={deleteResult} saveSettings={saveSettings} addKoMatch={addKoMatch} removeKoMatch={removeKoMatch} updateKoMatchDate={updateKoMatchDate} updateKoMatchTeams={updateKoMatchTeams} updateKoMatchUnlock={updateKoMatchUnlock} loadOfficialBracket={loadOfficialBracket} remapSeiziemesPreds={remapSeiziemesPreds} restorePredsBackup={restorePredsBackup} redoPreds={redoPreds} mergeAllPreds={mergeAllPreds} revertMerge={revertMerge} analyzeFolders={analyzeFolders} restoreKoFrom={restoreKoFrom} undoKoRestore={undoKoRestore} liveData={liveData} adminTab={adminTab} setAdminTab={setAdminTab} activeGroup={activeGroup} setActiveGroup={setActiveGroup} activeRound={activeRound} setActiveRound={setActiveRound} setResults={setResults} setPlayers={setPlayers} leaderboard={leaderboard} prevLeaderboard={prevLeaderboard} loadLeaderboard={loadLeaderboard}/>}
+        {page==="admin"&&<AdminPage results={results} settings={settings} koMatches={koMatches} players={players} saveResult={saveResult} deleteResult={deleteResult} saveSettings={saveSettings} addKoMatch={addKoMatch} removeKoMatch={removeKoMatch} updateKoMatchDate={updateKoMatchDate} updateKoMatchTeams={updateKoMatchTeams} updateKoMatchUnlock={updateKoMatchUnlock} loadOfficialBracket={loadOfficialBracket} remapSeiziemesPreds={remapSeiziemesPreds} restorePredsBackup={restorePredsBackup} redoPreds={redoPreds} mergeAllPreds={mergeAllPreds} revertMerge={revertMerge} analyzeFolders={analyzeFolders} restoreKoFrom={restoreKoFrom} undoKoRestore={undoKoRestore} consolidateAll={consolidateAll} removeBackupFolders={removeBackupFolders} liveData={liveData} adminTab={adminTab} setAdminTab={setAdminTab} activeGroup={activeGroup} setActiveGroup={setActiveGroup} activeRound={activeRound} setActiveRound={setActiveRound} setResults={setResults} setPlayers={setPlayers} leaderboard={leaderboard} prevLeaderboard={prevLeaderboard} loadLeaderboard={loadLeaderboard}/>}
       </div>
 
       {/* Barre de navigation bas — style Instagram */}
