@@ -2052,6 +2052,22 @@ function AdminPage({results,settings,koMatches,players,saveResult,deleteResult,s
           {/* 🌳 Arbre interactif (admin) */}
           <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:700,color:T.gold,margin:"4px 0 4px"}}>🌳 Tableau de la phase finale</div>
           <BracketView preds={{}} results={results} koMatches={koMatches} onChangePred={()=>{}} schedule={SCHEDULE} liveData={liveData||[]} admin={true} onSaveResult={saveResult} onSetDate={updateKoMatchDate} onSetTeams={updateKoMatchTeams} onRemoveMatch={removeKoMatch}/>
+
+          {/* 📝 Saisie simple des résultats (liste à plat, sans onglets) */}
+          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:700,color:T.text,margin:"20px 0 4px"}}>📝 Saisie des résultats</div>
+          <div style={{fontSize:12,color:T.muted,marginBottom:12,lineHeight:1.5}}>Entrez le score à 90 min de chaque match ici — le vainqueur avance tout seul dans le tableau. (Vous pouvez aussi toucher un match directement dans l'arbre ci-dessus.)</div>
+          {(()=>{
+            const allKo=[];
+            KO_ROUNDS.forEach(r=>(koMatches?.[r]||[]).forEach(m=>{if(m&&m.h&&m.a)allKo.push({...m,round:r});}));
+            allKo.sort((a,b)=>new Date(a.date||SCHEDULE[a.id]||0)-new Date(b.date||SCHEDULE[b.id]||0));
+            if(allKo.length===0) return <div style={{textAlign:"center",color:T.muted,padding:20,fontSize:14,background:T.card2,borderRadius:12,border:`1px solid ${T.border}`}}>Cliquez sur <b style={{color:T.gold}}>📋 Charger le tableau officiel</b> ci-dessus.<br/>Les matchs à saisir apparaîtront ici.</div>;
+            return allKo.map(m=>(
+              <div key={m.id} style={{marginBottom:12}}>
+                <div style={{fontSize:11,color:T.gold,fontWeight:700,marginBottom:3,letterSpacing:0.3}}>{m.round}</div>
+                <RRow type="ko" id={m.id} home={m.h} away={m.a} ko={true}/>
+              </div>
+            ));
+          })()}
         </div>
       )}
 
