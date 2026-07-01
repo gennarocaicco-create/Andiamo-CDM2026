@@ -703,9 +703,9 @@ const isoToLocalInput = (iso) => {
   return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 };
 
-const MatchCard=({match,pred,result,onChangePred,kickoff,live})=>{
+const MatchCard=({match,pred,result,onChangePred,kickoff,live,unlocked})=>{
   const p=matchPts(pred,result);
-  const locked=isMatchLocked(kickoff);
+  const locked=isMatchLocked(kickoff)&&!unlocked;
   const bc=p===2?T.green:p===1?T.blue:p===0?T.red:locked?"#f97316":T.border;
   const isLiveNow=live?.isLive;
   // Affichage dans l'ordre officiel FIFA. Le stockage (pred.h/pred.a) ne change pas :
@@ -1025,7 +1025,7 @@ function koAdvance(koMatches, round, matchId, result){
 }
 
 // Arbre interactif de la phase finale (tout le tableau d'un coup, façon FIFA)
-function BracketView({preds,results,koMatches,onChangePred,schedule,liveData,admin,onSaveResult,onSetDate,onSetTeams,onRemoveMatch}){
+function BracketView({preds,results,koMatches,onChangePred,schedule,liveData,admin,onSaveResult,onSetDate,onSetTeams,onSetUnlock,onRemoveMatch}){
   const [sel,setSel]=useState(null); // match sélectionné (mode joueur) -> {round, m}
   const [ed,setEd]=useState(null); // édition admin -> {round, m, ...champs}
   const koId=(round,i)=>`KO${KO_PREFIX[round]}${i+1}`;
@@ -1060,7 +1060,7 @@ function BracketView({preds,results,koMatches,onChangePred,schedule,liveData,adm
     const pH=pred?(flip?pred.a:pred.h):"", pA=pred?(flip?pred.h:pred.a):"";
     const hasPred=pH!==""&&pH!=null&&pA!==""&&pA!=null;
     const pts=(bothKnown&&result&&pred&&pred.h!=null&&pred.h!=="")?matchPts(pred,result):null;
-    const locked=date&&isMatchLocked(date);
+    const locked=date&&isMatchLocked(date)&&!m?.unlocked;
     const bc=pts===2?T.green:pts===1?T.blue:pts===0?T.red:(locked?"#f97316":T.border);
     // Vainqueur réel pour l'arbre : 90 min, sinon prolongation, sinon tirs au but
     const winSide=koWinnerSide(result);
@@ -1116,7 +1116,7 @@ function BracketView({preds,results,koMatches,onChangePred,schedule,liveData,adm
               <div style={{color:T.gold,fontWeight:800,fontFamily:"'Barlow Condensed',sans-serif",fontSize:21,letterSpacing:1}}>{sel.round}</div>
               <button onClick={()=>setSel(null)} style={{background:T.card2,color:T.text,border:`1px solid ${T.border}`,borderRadius:"50%",width:32,height:32,fontSize:15,cursor:"pointer",lineHeight:1,flexShrink:0}}>✕</button>
             </div>
-            <MatchCard match={{h:sel.m.h,a:sel.m.a}} pred={preds.ko?.[sel.m.id]||{}} result={results.ko?.[sel.m.id]} onChangePred={(f,v)=>onChangePred("ko",sel.m.id,f,v)} kickoff={sel.m.date||schedule?.[sel.m.id]} live={getLiveMatch(liveData,sel.m.h,sel.m.a)}/>
+            <MatchCard match={{h:sel.m.h,a:sel.m.a}} pred={preds.ko?.[sel.m.id]||{}} result={results.ko?.[sel.m.id]} onChangePred={(f,v)=>onChangePred("ko",sel.m.id,f,v)} kickoff={sel.m.date||schedule?.[sel.m.id]} live={getLiveMatch(liveData,sel.m.h,sel.m.a)} unlocked={sel.m.unlocked}/>
           </div>
         </div>
       )}
@@ -1155,6 +1155,10 @@ function BracketView({preds,results,koMatches,onChangePred,schedule,liveData,adm
               <div style={{display:"flex",alignItems:"center",gap:6,margin:"6px 0 12px"}}>
                 <span style={{fontSize:12,color:T.muted}}>📅</span>
                 <input type="datetime-local" value={isoToLocalInput(ed.m.date||SCHEDULE[ed.m.id])} onChange={e=>{const v=e.target.value; onSetDate(ed.round, ed.m.id, v?new Date(v).toISOString():"");}} style={{flex:1,background:"#111b2d",border:`1px solid ${T.border}`,borderRadius:8,padding:"7px 10px",color:"#fff",fontSize:13,outline:"none",colorScheme:"dark",fontFamily:"Inter,sans-serif"}}/>
+              </div>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,margin:"6px 0 12px",background:ed.m.unlocked?"#0e2a1a":T.card2,borderRadius:10,padding:"10px 12px",border:`1px solid ${ed.m.unlocked?T.green+"66":T.border}`}}>
+                <div style={{fontSize:12.5,color:ed.m.unlocked?T.green:T.text,fontWeight:600,lineHeight:1.4}}>{ed.m.unlocked?"🔓 Match rouvert aux pronos":"🔒 Verrouillage automatique (30 min avant)"}</div>
+                <button onClick={()=>{const nv=!ed.m.unlocked; onSetUnlock(ed.round, ed.m.id, nv); setEd(p=>({...p, m:{...p.m, unlocked:nv}}));}} style={{background:ed.m.unlocked?T.green:"#334155",color:ed.m.unlocked?"#031208":"#fff",border:"none",borderRadius:20,padding:"7px 14px",fontWeight:700,fontSize:12,cursor:"pointer",fontFamily:"Inter,sans-serif",flexShrink:0}}>{ed.m.unlocked?"Reverrouiller":"Déverrouiller"}</button>
               </div>
               <div style={{display:"flex",gap:8}}>
                 <button onClick={save} style={{flex:1,background:T.green,color:"#031208",border:"none",borderRadius:10,padding:"11px",fontWeight:800,fontSize:14,cursor:"pointer",fontFamily:"Inter,sans-serif"}}>💾 Enregistrer</button>
@@ -1859,7 +1863,7 @@ function QualificationsPanel({results,koMatches,addKoMatch}){
   );
 }
 
-function AdminPage({results,settings,koMatches,players,saveResult,deleteResult,saveSettings,addKoMatch,removeKoMatch,updateKoMatchDate,updateKoMatchTeams,loadOfficialBracket,remapSeiziemesPreds,restorePredsBackup,liveData,adminTab,setAdminTab,activeGroup,setActiveGroup,activeRound,setActiveRound,setResults,setPlayers,leaderboard,prevLeaderboard,loadLeaderboard}){
+function AdminPage({results,settings,koMatches,players,saveResult,deleteResult,saveSettings,addKoMatch,removeKoMatch,updateKoMatchDate,updateKoMatchTeams,updateKoMatchUnlock,loadOfficialBracket,remapSeiziemesPreds,restorePredsBackup,liveData,adminTab,setAdminTab,activeGroup,setActiveGroup,activeRound,setActiveRound,setResults,setPlayers,leaderboard,prevLeaderboard,loadLeaderboard}){
   const[tmp,setTmp]=useState({});
   const[newH,setNewH]=useState("");
   const[newA,setNewA]=useState("");
@@ -2066,7 +2070,7 @@ function AdminPage({results,settings,koMatches,players,saveResult,deleteResult,s
 
           {/* 🌳 Arbre interactif (admin) */}
           <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:700,color:T.gold,margin:"4px 0 4px"}}>🌳 Tableau de la phase finale</div>
-          <BracketView preds={{}} results={results} koMatches={koMatches} onChangePred={()=>{}} schedule={SCHEDULE} liveData={liveData||[]} admin={true} onSaveResult={saveResult} onSetDate={updateKoMatchDate} onSetTeams={updateKoMatchTeams} onRemoveMatch={removeKoMatch}/>
+          <BracketView preds={{}} results={results} koMatches={koMatches} onChangePred={()=>{}} schedule={SCHEDULE} liveData={liveData||[]} admin={true} onSaveResult={saveResult} onSetDate={updateKoMatchDate} onSetTeams={updateKoMatchTeams} onSetUnlock={updateKoMatchUnlock} onRemoveMatch={removeKoMatch}/>
 
           {/* 📝 Saisie simple des résultats (liste à plat, sans onglets) */}
           <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:700,color:T.text,margin:"20px 0 4px"}}>📝 Saisie des résultats</div>
@@ -2716,7 +2720,14 @@ function App(){
     setKoMatches(updated);await ss("koMatches",updated);
   };
   const updateKoMatchDate=async(round,id,date)=>{
-    const updated={...koMatches,[round]:(koMatches[round]||[]).map(m=>m.id===id?{...m,date}:m)};
+    let arr=(koMatches[round]||[]).map(m=>m.id===id?{...m,date}:m);
+    // Réordonner le tour par date : le match se replace au bon endroit pour TOUS
+    arr=arr.slice().sort((a,b)=>new Date(a?.date||SCHEDULE[a?.id]||"2100-01-01")-new Date(b?.date||SCHEDULE[b?.id]||"2100-01-01"));
+    const updated={...koMatches,[round]:arr};
+    setKoMatches(updated);await ss("koMatches",updated);
+  };
+  const updateKoMatchUnlock=async(round,id,unlocked)=>{
+    const updated={...koMatches,[round]:(koMatches[round]||[]).map(m=>m&&m.id===id?{...m,unlocked}:m)};
     setKoMatches(updated);await ss("koMatches",updated);
   };
   const updateKoMatchTeams=async(round,id,h,a)=>{
@@ -2961,7 +2972,7 @@ function App(){
             )}
           </div>
         )}
-        {page==="admin"&&<AdminPage results={results} settings={settings} koMatches={koMatches} players={players} saveResult={saveResult} deleteResult={deleteResult} saveSettings={saveSettings} addKoMatch={addKoMatch} removeKoMatch={removeKoMatch} updateKoMatchDate={updateKoMatchDate} updateKoMatchTeams={updateKoMatchTeams} loadOfficialBracket={loadOfficialBracket} remapSeiziemesPreds={remapSeiziemesPreds} restorePredsBackup={restorePredsBackup} liveData={liveData} adminTab={adminTab} setAdminTab={setAdminTab} activeGroup={activeGroup} setActiveGroup={setActiveGroup} activeRound={activeRound} setActiveRound={setActiveRound} setResults={setResults} setPlayers={setPlayers} leaderboard={leaderboard} prevLeaderboard={prevLeaderboard} loadLeaderboard={loadLeaderboard}/>}
+        {page==="admin"&&<AdminPage results={results} settings={settings} koMatches={koMatches} players={players} saveResult={saveResult} deleteResult={deleteResult} saveSettings={saveSettings} addKoMatch={addKoMatch} removeKoMatch={removeKoMatch} updateKoMatchDate={updateKoMatchDate} updateKoMatchTeams={updateKoMatchTeams} updateKoMatchUnlock={updateKoMatchUnlock} loadOfficialBracket={loadOfficialBracket} remapSeiziemesPreds={remapSeiziemesPreds} restorePredsBackup={restorePredsBackup} liveData={liveData} adminTab={adminTab} setAdminTab={setAdminTab} activeGroup={activeGroup} setActiveGroup={setActiveGroup} activeRound={activeRound} setActiveRound={setActiveRound} setResults={setResults} setPlayers={setPlayers} leaderboard={leaderboard} prevLeaderboard={prevLeaderboard} loadLeaderboard={loadLeaderboard}/>}
       </div>
 
       {/* Barre de navigation bas — style Instagram */}
