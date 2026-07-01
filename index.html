@@ -640,25 +640,25 @@ const SCHEDULE = {
   "M71":"2026-06-27T17:00:00-04:00", // Angleterre vs Panama
   "M72":"2026-06-27T17:00:00-04:00", // Croatie vs Ghana
 
-  // ===== PHASE FINALE (heures en heure française CEST, +02:00) — positions = image officielle =====
-  // Seizièmes — KOSei1..16 = positions du tableau (gauche 1-8 haut→bas, droite 9-16 haut→bas)
-  "KOSei1":"2026-06-29T22:30:00+02:00",  // Allemagne - Paraguay
-  "KOSei2":"2026-06-30T23:00:00+02:00",  // France - Suède
-  "KOSei3":"2026-06-28T21:00:00+02:00",  // Afrique du Sud - Canada
+  // ===== PHASE FINALE (heures en heure française CEST, +02:00) — ordre CHRONOLOGIQUE =====
+  // Seizièmes — KOSei1..16 dans l'ordre chronologique (comme les pronos)
+  "KOSei1":"2026-06-28T21:00:00+02:00",  // Afrique du Sud - Canada
+  "KOSei2":"2026-06-29T19:00:00+02:00",  // Brésil - Japon
+  "KOSei3":"2026-06-29T22:30:00+02:00",  // Allemagne - Paraguay
   "KOSei4":"2026-06-30T03:00:00+02:00",  // Pays-Bas - Maroc
-  "KOSei5":"2026-07-03T01:00:00+02:00",  // Portugal - Croatie
-  "KOSei6":"2026-07-02T21:00:00+02:00",  // Espagne - Autriche
-  "KOSei7":"2026-07-02T02:00:00+02:00",  // États-Unis - Bosnie-Herzégovine
-  "KOSei8":"2026-07-01T22:00:00+02:00",  // Belgique - Sénégal
-  "KOSei9":"2026-06-29T19:00:00+02:00",  // Brésil - Japon
-  "KOSei10":"2026-06-30T19:00:00+02:00", // Côte d'Ivoire - Norvège
-  "KOSei11":"2026-07-01T03:00:00+02:00", // Mexique - Équateur
-  "KOSei12":"2026-07-01T18:00:00+02:00", // Angleterre - RD Congo
-  "KOSei13":"2026-07-04T00:00:00+02:00", // Argentine - Cap-Vert
+  "KOSei5":"2026-06-30T19:00:00+02:00",  // Côte d'Ivoire - Norvège
+  "KOSei6":"2026-06-30T23:00:00+02:00",  // France - Suède
+  "KOSei7":"2026-07-01T03:00:00+02:00",  // Mexique - Équateur
+  "KOSei8":"2026-07-01T18:00:00+02:00",  // Angleterre - RD Congo
+  "KOSei9":"2026-07-01T22:00:00+02:00",  // Belgique - Sénégal
+  "KOSei10":"2026-07-02T02:00:00+02:00", // États-Unis - Bosnie-Herzégovine
+  "KOSei11":"2026-07-02T21:00:00+02:00", // Espagne - Autriche
+  "KOSei12":"2026-07-03T01:00:00+02:00", // Portugal - Croatie
+  "KOSei13":"2026-07-03T05:00:00+02:00", // Suisse - Algérie
   "KOSei14":"2026-07-03T20:00:00+02:00", // Égypte - Australie
-  "KOSei15":"2026-07-03T05:00:00+02:00", // Suisse - Algérie
+  "KOSei15":"2026-07-04T00:00:00+02:00", // Argentine - Cap-Vert
   "KOSei16":"2026-07-04T03:30:00+02:00", // Colombie - Ghana
-  // Huitièmes — KOHui1..8 = positions
+  // Huitièmes — KOHui1..8
   "KOHui1":"2026-07-04T23:00:00+02:00",
   "KOHui2":"2026-07-04T19:00:00+02:00",
   "KOHui3":"2026-07-06T21:00:00+02:00",
@@ -966,24 +966,24 @@ function BonusPage({preds,settings,onChangeBonus}){
 }
 
 const KO_PREFIX = {"Seizièmes":"Sei","Huitièmes":"Hui","Quarts":"Qua","Demi-finales":"Dem","Petite finale":"Pet","Finale":"Fin"};
-// Tableau officiel des 16es de finale (image CDM 2026) — positions = ordre du tableau
+// Tableau des 16es dans l'ORDRE CHRONOLOGIQUE (ordre dans lequel les joueurs ont pronostiqué)
 const KO_OFFICIEL = [
-  {id:"KOSei1",  h:"Allemagne",     a:"Paraguay"},
-  {id:"KOSei2",  h:"France",        a:"Suède"},
-  {id:"KOSei3",  h:"Afrique du Sud",a:"Canada"},
-  {id:"KOSei4",  h:"Pays-Bas",      a:"Maroc"},
-  {id:"KOSei5",  h:"Portugal",      a:"Croatie"},
-  {id:"KOSei6",  h:"Espagne",       a:"Autriche"},
-  {id:"KOSei7",  h:"États-Unis",    a:"Bosnie-Herzégovine"},
-  {id:"KOSei8",  h:"Belgique",      a:"Sénégal"},
-  {id:"KOSei9",  h:"Brésil",        a:"Japon"},
-  {id:"KOSei10", h:"Côte d'Ivoire", a:"Norvège"},
-  {id:"KOSei11", h:"Mexique",       a:"Équateur"},
-  {id:"KOSei12", h:"Angleterre",    a:"RD Congo"},
-  {id:"KOSei13", h:"Argentine",     a:"Cap-Vert"},
-  {id:"KOSei14", h:"Égypte",        a:"Australie"},
-  {id:"KOSei15", h:"Suisse",        a:"Algérie"},
-  {id:"KOSei16", h:"Colombie",      a:"Ghana"},
+  {id:"KOSei1",  h:"Afrique du Sud", a:"Canada"},            // 28/06 21h00
+  {id:"KOSei2",  h:"Brésil",         a:"Japon"},             // 29/06 19h00
+  {id:"KOSei3",  h:"Allemagne",      a:"Paraguay"},          // 29/06 22h30
+  {id:"KOSei4",  h:"Pays-Bas",       a:"Maroc"},             // 30/06 03h00
+  {id:"KOSei5",  h:"Côte d'Ivoire",  a:"Norvège"},           // 30/06 19h00
+  {id:"KOSei6",  h:"France",         a:"Suède"},             // 30/06 23h00
+  {id:"KOSei7",  h:"Mexique",        a:"Équateur"},          // 01/07 03h00
+  {id:"KOSei8",  h:"Angleterre",     a:"RD Congo"},          // 01/07 18h00
+  {id:"KOSei9",  h:"Belgique",       a:"Sénégal"},           // 01/07 22h00
+  {id:"KOSei10", h:"États-Unis",     a:"Bosnie-Herzégovine"},// 02/07 02h00
+  {id:"KOSei11", h:"Espagne",        a:"Autriche"},          // 02/07 21h00
+  {id:"KOSei12", h:"Portugal",       a:"Croatie"},           // 03/07 01h00
+  {id:"KOSei13", h:"Suisse",         a:"Algérie"},           // 03/07 05h00
+  {id:"KOSei14", h:"Égypte",         a:"Australie"},         // 03/07 20h00
+  {id:"KOSei15", h:"Argentine",      a:"Cap-Vert"},          // 04/07 00h00
+  {id:"KOSei16", h:"Colombie",       a:"Ghana"},             // 04/07 03h30
 ];
 // Progression des vainqueurs d'un tour vers le suivant
 const NEXT_ROUND = {"Seizièmes":"Huitièmes","Huitièmes":"Quarts","Quarts":"Demi-finales","Demi-finales":"Finale"};
@@ -2045,31 +2045,10 @@ function AdminPage({results,settings,koMatches,players,saveResult,deleteResult,s
 
       {adminTab==="knockout"&&(
         <div>
-          {/* 📋 Charger le tableau officiel de l'image */}
+          {/* 📋 Remettre les 16es dans l'ordre chronologique */}
           <div style={{background:T.card2,borderRadius:12,padding:14,marginBottom:14,border:`1px solid ${T.border}`}}>
-            <div style={{fontSize:13,color:T.text,lineHeight:1.6,marginBottom:10}}>Pour avoir le tableau <b>exactement comme l'image officielle</b> (bonnes équipes, bon ordre, bonnes heures), cliquez ici. À faire une seule fois :</div>
-            <button onClick={()=>{if(confirm("Charger le tableau officiel des 16es de finale (image CDM 2026) ?\n\nCela met les 16 affiches exactes, dans le bon ordre et aux bonnes heures, et réinitialise les tours suivants (qui se rempliront automatiquement avec les vainqueurs).\n\nLes pronostics des participants ne sont PAS effacés."))loadOfficialBracket();}} style={{width:"100%",background:"linear-gradient(135deg,#b45309,#f59e0b)",color:"#1a1205",border:"none",borderRadius:12,padding:"14px",fontWeight:800,fontSize:15,cursor:"pointer",fontFamily:"Inter,sans-serif",boxShadow:"0 4px 14px rgba(245,158,11,0.3)"}}>📋 Charger le tableau officiel des 16es</button>
-          </div>
-
-          {/* 🔧 Réaligner les pronos (récupération) */}
-          <div style={{background:"#1a1420",borderRadius:12,padding:14,marginBottom:14,border:`1px solid #7c3aed55`}}>
-            <div style={{fontWeight:800,fontSize:14,color:"#c4b5fd",marginBottom:6}}>🔧 Réaligner les pronos des seizièmes</div>
-            <div style={{fontSize:12,color:T.muted,lineHeight:1.6,marginBottom:10}}>Si vous avez chargé le tableau officiel <b>après</b> que les joueurs aient pronostiqué, leurs pronos sont décalés (ex. France-Suède affiche le prono de Brésil-Japon). Ce bouton remet chaque prono sur le bon match, <b>sans toucher à l'arbre</b>. Une sauvegarde est faite avant, donc c'est annulable.</div>
-            <button disabled={remapBusy} onClick={async()=>{
-              if(!confirm("Réaligner les pronos des seizièmes de TOUS les participants selon le nouvel ordre du tableau ?\n\nUne sauvegarde automatique est faite avant (bouton Annuler disponible juste après).\n\n⚠️ À ne faire qu'UNE SEULE FOIS.")) return;
-              setRemapBusy(true); setRemapMsg("Réalignement en cours…");
-              try{ const r=await remapSeiziemesPreds(); setRemapMsg(`✅ ${r.count} pronos réalignés pour ${r.players} participant(s). Vérifiez le classement, puis si c'est bon vous n'avez plus rien à faire. Si c'est faux, cliquez sur Annuler.`); }
-              catch(e){ setRemapMsg("❌ Erreur : "+e.message); }
-              setRemapBusy(false);
-            }} style={{width:"100%",background:remapBusy?T.card2:"#7c3aed",color:"#fff",border:"none",borderRadius:10,padding:"12px",fontWeight:700,fontSize:14,cursor:remapBusy?"default":"pointer",fontFamily:"Inter,sans-serif",marginBottom:8}}>{remapBusy?"⏳ Patientez…":"🔧 Réaligner les pronos maintenant"}</button>
-            <button disabled={remapBusy} onClick={async()=>{
-              if(!confirm("Restaurer la sauvegarde des pronos (annuler le réalignement) ?")) return;
-              setRemapBusy(true); setRemapMsg("Restauration…");
-              try{ const n=await restorePredsBackup(); setRemapMsg(n<0?"⚠️ Aucune sauvegarde trouvée.":`↩️ Sauvegarde restaurée pour ${n} participant(s).`); }
-              catch(e){ setRemapMsg("❌ Erreur : "+e.message); }
-              setRemapBusy(false);
-            }} style={{width:"100%",background:"transparent",color:T.muted,border:`1px solid ${T.border}`,borderRadius:10,padding:"10px",fontWeight:600,fontSize:13,cursor:"pointer",fontFamily:"Inter,sans-serif"}}>↩️ Annuler (restaurer la sauvegarde)</button>
-            {remapMsg&&<div style={{fontSize:12,color:T.text,marginTop:10,lineHeight:1.5,background:T.card2,borderRadius:8,padding:"8px 10px"}}>{remapMsg}</div>}
+            <div style={{fontSize:13,color:T.text,lineHeight:1.6,marginBottom:10}}>Ce bouton remet les 16 seizièmes dans l'<b>ordre chronologique</b> (celui dans lequel les joueurs ont pronostiqué), pour que les pronos correspondent au bon match.</div>
+            <button onClick={()=>{if(confirm("Remettre les 16es de finale dans l'ordre chronologique (comme au moment des pronos) ?\n\nCela réordonne les 16 matchs et réinitialise les tours suivants. Les pronostics des participants ne sont PAS effacés — ils se recolleront au bon match."))loadOfficialBracket();}} style={{width:"100%",background:"linear-gradient(135deg,#0e7490,#06b6d4)",color:"#04121a",border:"none",borderRadius:12,padding:"14px",fontWeight:800,fontSize:15,cursor:"pointer",fontFamily:"Inter,sans-serif",boxShadow:"0 4px 14px rgba(6,182,212,0.3)"}}>🔄 Remettre les 16es dans l'ordre chronologique</button>
           </div>
 
           {/* 🌳 Arbre interactif (admin) */}
