@@ -1863,7 +1863,7 @@ function QualificationsPanel({results,koMatches,addKoMatch}){
   );
 }
 
-function AdminPage({results,settings,koMatches,players,saveResult,deleteResult,saveSettings,addKoMatch,removeKoMatch,updateKoMatchDate,updateKoMatchTeams,updateKoMatchUnlock,loadOfficialBracket,remapSeiziemesPreds,restorePredsBackup,redoPreds,liveData,adminTab,setAdminTab,activeGroup,setActiveGroup,activeRound,setActiveRound,setResults,setPlayers,leaderboard,prevLeaderboard,loadLeaderboard}){
+function AdminPage({results,settings,koMatches,players,saveResult,deleteResult,saveSettings,addKoMatch,removeKoMatch,updateKoMatchDate,updateKoMatchTeams,updateKoMatchUnlock,loadOfficialBracket,remapSeiziemesPreds,restorePredsBackup,redoPreds,mergeAllPreds,revertMerge,liveData,adminTab,setAdminTab,activeGroup,setActiveGroup,activeRound,setActiveRound,setResults,setPlayers,leaderboard,prevLeaderboard,loadLeaderboard}){
   const[tmp,setTmp]=useState({});
   const[newH,setNewH]=useState("");
   const[newA,setNewA]=useState("");
@@ -2053,6 +2053,27 @@ function AdminPage({results,settings,koMatches,players,saveResult,deleteResult,s
           <div style={{background:T.card2,borderRadius:12,padding:14,marginBottom:14,border:`1px solid ${T.border}`}}>
             <div style={{fontSize:13,color:T.text,lineHeight:1.6,marginBottom:10}}>Ce bouton remet les 16 seizièmes dans l'<b>ordre chronologique</b> (celui dans lequel les joueurs ont pronostiqué), pour que les pronos correspondent au bon match.</div>
             <button onClick={()=>{if(confirm("Remettre les 16es de finale dans l'ordre chronologique (comme au moment des pronos) ?\n\nCela réordonne les 16 matchs et réinitialise les tours suivants. Les pronostics des participants ne sont PAS effacés — ils se recolleront au bon match."))loadOfficialBracket();}} style={{width:"100%",background:"linear-gradient(135deg,#0e7490,#06b6d4)",color:"#04121a",border:"none",borderRadius:12,padding:"14px",fontWeight:800,fontSize:15,cursor:"pointer",fontFamily:"Inter,sans-serif",boxShadow:"0 4px 14px rgba(6,182,212,0.3)"}}>🔄 Remettre les 16es dans l'ordre chronologique</button>
+          </div>
+
+          {/* 🔁 Récupérer TOUS les scores (fusion des 3 sources) */}
+          <div style={{background:"#0e1f1a",borderRadius:12,padding:14,marginBottom:14,border:`1px solid ${T.green}55`}}>
+            <div style={{fontWeight:800,fontSize:14,color:T.green,marginBottom:6}}>🔁 Récupérer TOUS les scores disparus</div>
+            <div style={{fontSize:12,color:T.muted,lineHeight:1.6,marginBottom:10}}>Fusionne <b>predictions</b> + <b>predictions_backup</b> + <b>predictions_redo</b>. Garde les pronos actuels et <b>rajoute tous ceux qui manquent</b>. Rien n'est écrasé, seulement complété.</div>
+            <button disabled={remapBusy} onClick={async()=>{
+              if(!confirm("Récupérer tous les pronos en fusionnant les 3 sources ?\n\nÇa garde les pronos actuels et ajoute ceux qui manquent (depuis backup et redo).\n\nUne sauvegarde est faite avant (bouton Annuler la fusion disponible).")) return;
+              setRemapBusy(true); setRemapMsg("Fusion en cours…");
+              try{ const r=await mergeAllPreds(); setRemapMsg(`✅ Fusion terminée : ${r.recovered} prono(s) récupéré(s) sur ${r.players} participant(s). Vérifiez le classement.`); }
+              catch(e){ setRemapMsg("❌ Erreur : "+e.message); }
+              setRemapBusy(false);
+            }} style={{width:"100%",background:remapBusy?T.card2:T.green,color:"#031208",border:"none",borderRadius:10,padding:"13px",fontWeight:800,fontSize:14.5,cursor:remapBusy?"default":"pointer",fontFamily:"Inter,sans-serif",marginBottom:8}}>{remapBusy?"⏳ Patientez…":"🔁 Récupérer tous les scores"}</button>
+            <button disabled={remapBusy} onClick={async()=>{
+              if(!confirm("Annuler la dernière fusion (revenir à l'état d'avant) ?")) return;
+              setRemapBusy(true); setRemapMsg("Annulation…");
+              try{ const n=await revertMerge(); setRemapMsg(n<0?"⚠️ Rien à annuler.":`↩️ Fusion annulée pour ${n} participant(s).`); }
+              catch(e){ setRemapMsg("❌ Erreur : "+e.message); }
+              setRemapBusy(false);
+            }} style={{width:"100%",background:"transparent",color:T.muted,border:`1px solid ${T.border}`,borderRadius:10,padding:"9px",fontWeight:600,fontSize:12.5,cursor:"pointer",fontFamily:"Inter,sans-serif"}}>↩️ Annuler la fusion</button>
+            {remapMsg&&<div style={{fontSize:12,color:T.text,marginTop:10,lineHeight:1.5,background:T.card2,borderRadius:8,padding:"8px 10px"}}>{remapMsg}</div>}
           </div>
 
           {/* ↩️ Revenir en arrière / Refaire */}
@@ -2786,6 +2807,37 @@ function App(){
     for(const p of Object.keys(redo)){ await ss(`predictions/${p}`, redo[p]); n++; }
     return n;
   };
+  // 🔁 Fusionne predictions + predictions_backup + predictions_redo pour récupérer TOUS les pronos.
+  // Additif : garde les pronos actuels, et ajoute ceux qui manquent (redo prioritaire, puis backup).
+  const mergeAllPreds=async()=>{
+    const freshPlayers=await sg("players",{});
+    const bak=(await sg("predictions_backup",{}))||{};
+    const redo=(await sg("predictions_redo",{}))||{};
+    const cur={};
+    for(const p of Object.keys(freshPlayers)){ cur[p]=await sg(`predictions/${p}`,{grp:{},ko:{},bonus:{}}); }
+    await ss("predictions_beforemerge", JSON.parse(JSON.stringify(cur))); // filet de sécurité
+    const allPlayers=new Set([...Object.keys(cur),...Object.keys(bak),...Object.keys(redo),...Object.keys(freshPlayers)]);
+    let recovered=0, playersTouched=0;
+    for(const p of allPlayers){
+      const c=cur[p]||{}, b=bak[p]||{}, r=redo[p]||{};
+      const merge=(cat)=>({...(b[cat]||{}), ...(r[cat]||{}), ...(c[cat]||{})}); // c gagne, sinon r, sinon b
+      const mg={grp:merge("grp"), ko:merge("ko"), bonus:merge("bonus")};
+      for(const cat of ["grp","ko","bonus"]){
+        const before=Object.keys(c[cat]||{}).length, after=Object.keys(mg[cat]).length;
+        if(after>before) recovered+=(after-before);
+      }
+      await ss(`predictions/${p}`, mg);
+      playersTouched++;
+    }
+    return {recovered, players:playersTouched};
+  };
+  const revertMerge=async()=>{
+    const before=await sg("predictions_beforemerge",null);
+    if(!before) return -1;
+    let n=0;
+    for(const p of Object.keys(before)){ await ss(`predictions/${p}`, before[p]); n++; }
+    return n;
+  };
   const removeKoMatch=async(round,id)=>{
     const updated={...koMatches,[round]:(koMatches[round]||[]).filter(m=>m.id!==id)};
     setKoMatches(updated);await ss("koMatches",updated);
@@ -2991,7 +3043,7 @@ function App(){
             )}
           </div>
         )}
-        {page==="admin"&&<AdminPage results={results} settings={settings} koMatches={koMatches} players={players} saveResult={saveResult} deleteResult={deleteResult} saveSettings={saveSettings} addKoMatch={addKoMatch} removeKoMatch={removeKoMatch} updateKoMatchDate={updateKoMatchDate} updateKoMatchTeams={updateKoMatchTeams} updateKoMatchUnlock={updateKoMatchUnlock} loadOfficialBracket={loadOfficialBracket} remapSeiziemesPreds={remapSeiziemesPreds} restorePredsBackup={restorePredsBackup} redoPreds={redoPreds} liveData={liveData} adminTab={adminTab} setAdminTab={setAdminTab} activeGroup={activeGroup} setActiveGroup={setActiveGroup} activeRound={activeRound} setActiveRound={setActiveRound} setResults={setResults} setPlayers={setPlayers} leaderboard={leaderboard} prevLeaderboard={prevLeaderboard} loadLeaderboard={loadLeaderboard}/>}
+        {page==="admin"&&<AdminPage results={results} settings={settings} koMatches={koMatches} players={players} saveResult={saveResult} deleteResult={deleteResult} saveSettings={saveSettings} addKoMatch={addKoMatch} removeKoMatch={removeKoMatch} updateKoMatchDate={updateKoMatchDate} updateKoMatchTeams={updateKoMatchTeams} updateKoMatchUnlock={updateKoMatchUnlock} loadOfficialBracket={loadOfficialBracket} remapSeiziemesPreds={remapSeiziemesPreds} restorePredsBackup={restorePredsBackup} redoPreds={redoPreds} mergeAllPreds={mergeAllPreds} revertMerge={revertMerge} liveData={liveData} adminTab={adminTab} setAdminTab={setAdminTab} activeGroup={activeGroup} setActiveGroup={setActiveGroup} activeRound={activeRound} setActiveRound={setActiveRound} setResults={setResults} setPlayers={setPlayers} leaderboard={leaderboard} prevLeaderboard={prevLeaderboard} loadLeaderboard={loadLeaderboard}/>}
       </div>
 
       {/* Barre de navigation bas — style Instagram */}
