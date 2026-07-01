@@ -1863,7 +1863,7 @@ function QualificationsPanel({results,koMatches,addKoMatch}){
   );
 }
 
-function AdminPage({results,settings,koMatches,players,saveResult,deleteResult,saveSettings,addKoMatch,removeKoMatch,updateKoMatchDate,updateKoMatchTeams,updateKoMatchUnlock,loadOfficialBracket,remapSeiziemesPreds,restorePredsBackup,liveData,adminTab,setAdminTab,activeGroup,setActiveGroup,activeRound,setActiveRound,setResults,setPlayers,leaderboard,prevLeaderboard,loadLeaderboard}){
+function AdminPage({results,settings,koMatches,players,saveResult,deleteResult,saveSettings,addKoMatch,removeKoMatch,updateKoMatchDate,updateKoMatchTeams,updateKoMatchUnlock,loadOfficialBracket,remapSeiziemesPreds,restorePredsBackup,redoPreds,liveData,adminTab,setAdminTab,activeGroup,setActiveGroup,activeRound,setActiveRound,setResults,setPlayers,leaderboard,prevLeaderboard,loadLeaderboard}){
   const[tmp,setTmp]=useState({});
   const[newH,setNewH]=useState("");
   const[newA,setNewA]=useState("");
@@ -2055,16 +2055,23 @@ function AdminPage({results,settings,koMatches,players,saveResult,deleteResult,s
             <button onClick={()=>{if(confirm("Remettre les 16es de finale dans l'ordre chronologique (comme au moment des pronos) ?\n\nCela réordonne les 16 matchs et réinitialise les tours suivants. Les pronostics des participants ne sont PAS effacés — ils se recolleront au bon match."))loadOfficialBracket();}} style={{width:"100%",background:"linear-gradient(135deg,#0e7490,#06b6d4)",color:"#04121a",border:"none",borderRadius:12,padding:"14px",fontWeight:800,fontSize:15,cursor:"pointer",fontFamily:"Inter,sans-serif",boxShadow:"0 4px 14px rgba(6,182,212,0.3)"}}>🔄 Remettre les 16es dans l'ordre chronologique</button>
           </div>
 
-          {/* ↩️ Restaurer les pronos depuis la sauvegarde */}
+          {/* ↩️ Revenir en arrière / Refaire */}
           <div style={{background:"#141a20",borderRadius:12,padding:14,marginBottom:14,border:`1px solid ${T.border}`}}>
-            <div style={{fontSize:13,color:T.text,lineHeight:1.6,marginBottom:10}}>Si des pronos ont disparu de <b>predictions</b> et se trouvent dans <b>predictions_backup</b>, ce bouton remet la sauvegarde (les pronos originaux, ordre chronologique) dans predictions.</div>
+            <div style={{fontSize:13,color:T.text,lineHeight:1.6,marginBottom:10}}>Machine à remonter le temps pour les pronos. <b>Revenir en arrière</b> = remet la sauvegarde (predictions_backup) dans les pronos. <b>Refaire</b> = annule ce retour.</div>
             <button disabled={remapBusy} onClick={async()=>{
-              if(!confirm("Restaurer TOUS les pronos depuis la sauvegarde (predictions_backup) ?\n\n⚠️ Cela remplace les pronos actuels par ceux de la sauvegarde. À faire uniquement si des pronos ont disparu.")) return;
-              setRemapBusy(true); setRemapMsg("Restauration en cours…");
-              try{ const n=await restorePredsBackup(); setRemapMsg(n<0?"⚠️ Aucune sauvegarde trouvée.":`↩️ Sauvegarde restaurée pour ${n} participant(s). Vérifiez le classement.`); }
+              if(!confirm("Revenir en arrière : remettre la sauvegarde des pronos ?\n\n(L'état actuel est gardé, vous pourrez Refaire.)")) return;
+              setRemapBusy(true); setRemapMsg("Retour en arrière…");
+              try{ const n=await restorePredsBackup(); setRemapMsg(n<0?"⚠️ Aucune sauvegarde trouvée.":`◀️ Sauvegarde remise pour ${n} participant(s). Vérifiez le classement. Pas bon ? → Refaire.`); }
               catch(e){ setRemapMsg("❌ Erreur : "+e.message); }
               setRemapBusy(false);
-            }} style={{width:"100%",background:remapBusy?T.card2:"#334155",color:"#fff",border:"none",borderRadius:10,padding:"12px",fontWeight:700,fontSize:14,cursor:remapBusy?"default":"pointer",fontFamily:"Inter,sans-serif"}}>{remapBusy?"⏳ Patientez…":"↩️ Restaurer les pronos (sauvegarde)"}</button>
+            }} style={{width:"100%",background:remapBusy?T.card2:"#334155",color:"#fff",border:"none",borderRadius:10,padding:"12px",fontWeight:700,fontSize:14,cursor:remapBusy?"default":"pointer",fontFamily:"Inter,sans-serif",marginBottom:8}}>{remapBusy?"⏳ Patientez…":"◀️ Revenir en arrière (remettre la sauvegarde)"}</button>
+            <button disabled={remapBusy} onClick={async()=>{
+              if(!confirm("Refaire : annuler le retour en arrière ?")) return;
+              setRemapBusy(true); setRemapMsg("Rétablissement…");
+              try{ const n=await redoPreds(); setRemapMsg(n<0?"⚠️ Rien à refaire (il faut d'abord Revenir en arrière).":`▶️ Rétabli pour ${n} participant(s).`); }
+              catch(e){ setRemapMsg("❌ Erreur : "+e.message); }
+              setRemapBusy(false);
+            }} style={{width:"100%",background:"transparent",color:T.muted,border:`1px solid ${T.border}`,borderRadius:10,padding:"10px",fontWeight:600,fontSize:13,cursor:"pointer",fontFamily:"Inter,sans-serif"}}>▶️ Refaire (annuler le retour)</button>
             {remapMsg&&<div style={{fontSize:12,color:T.text,marginTop:10,lineHeight:1.5,background:T.card2,borderRadius:8,padding:"8px 10px"}}>{remapMsg}</div>}
           </div>
 
@@ -2763,8 +2770,20 @@ function App(){
   const restorePredsBackup=async()=>{
     const backup=await sg("predictions_backup",null);
     if(!backup) return -1;
+    // Sauvegarder l'état ACTUEL avant de restaurer, pour pouvoir "Refaire"
+    const freshPlayers=await sg("players",{});
+    const cur={};
+    for(const p of Object.keys(freshPlayers)){ cur[p]=await sg(`predictions/${p}`,{grp:{},ko:{},bonus:{}}); }
+    await ss("predictions_redo", cur);
     let n=0;
     for(const p of Object.keys(backup)){ await ss(`predictions/${p}`, backup[p]); n++; }
+    return n;
+  };
+  const redoPreds=async()=>{
+    const redo=await sg("predictions_redo",null);
+    if(!redo) return -1;
+    let n=0;
+    for(const p of Object.keys(redo)){ await ss(`predictions/${p}`, redo[p]); n++; }
     return n;
   };
   const removeKoMatch=async(round,id)=>{
@@ -2972,7 +2991,7 @@ function App(){
             )}
           </div>
         )}
-        {page==="admin"&&<AdminPage results={results} settings={settings} koMatches={koMatches} players={players} saveResult={saveResult} deleteResult={deleteResult} saveSettings={saveSettings} addKoMatch={addKoMatch} removeKoMatch={removeKoMatch} updateKoMatchDate={updateKoMatchDate} updateKoMatchTeams={updateKoMatchTeams} updateKoMatchUnlock={updateKoMatchUnlock} loadOfficialBracket={loadOfficialBracket} remapSeiziemesPreds={remapSeiziemesPreds} restorePredsBackup={restorePredsBackup} liveData={liveData} adminTab={adminTab} setAdminTab={setAdminTab} activeGroup={activeGroup} setActiveGroup={setActiveGroup} activeRound={activeRound} setActiveRound={setActiveRound} setResults={setResults} setPlayers={setPlayers} leaderboard={leaderboard} prevLeaderboard={prevLeaderboard} loadLeaderboard={loadLeaderboard}/>}
+        {page==="admin"&&<AdminPage results={results} settings={settings} koMatches={koMatches} players={players} saveResult={saveResult} deleteResult={deleteResult} saveSettings={saveSettings} addKoMatch={addKoMatch} removeKoMatch={removeKoMatch} updateKoMatchDate={updateKoMatchDate} updateKoMatchTeams={updateKoMatchTeams} updateKoMatchUnlock={updateKoMatchUnlock} loadOfficialBracket={loadOfficialBracket} remapSeiziemesPreds={remapSeiziemesPreds} restorePredsBackup={restorePredsBackup} redoPreds={redoPreds} liveData={liveData} adminTab={adminTab} setAdminTab={setAdminTab} activeGroup={activeGroup} setActiveGroup={setActiveGroup} activeRound={activeRound} setActiveRound={setActiveRound} setResults={setResults} setPlayers={setPlayers} leaderboard={leaderboard} prevLeaderboard={prevLeaderboard} loadLeaderboard={loadLeaderboard}/>}
       </div>
 
       {/* Barre de navigation bas — style Instagram */}
