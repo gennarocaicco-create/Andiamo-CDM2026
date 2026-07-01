@@ -1024,8 +1024,35 @@ function koAdvance(koMatches, round, matchId, result){
   return updated;
 }
 
+// Retire le vainqueur avancé (inverse de koAdvance) — seulement si la case suivante contient encore ce vainqueur
+function koUnadvance(koMatches, round, matchId, prevResult){
+  const list = koMatches[round]||[];
+  const idx = list.findIndex(x=>x && x.id===matchId);
+  if(idx<0) return koMatches;
+  const m = list[idx];
+  const side = koWinnerSide(prevResult);
+  if(!side) return koMatches;
+  const winner = side==="h"?m.h:m.a;
+  const loser  = side==="h"?m.a:m.h;
+  const targetIdx = Math.floor(idx/2);
+  const slot = idx%2===0 ? "h" : "a";
+  let updated = koMatches; let changed=false;
+  const clear=(nextRound, team)=>{
+    const src = updated[nextRound]||[];
+    if(src[targetIdx] && src[targetIdx][slot]===team){
+      const arr = [...src];
+      arr[targetIdx] = {...arr[targetIdx], [slot]: ""};
+      updated = {...updated, [nextRound]: arr}; changed=true;
+    }
+  };
+  const nextR = NEXT_ROUND[round];
+  if(nextR && winner) clear(nextR, winner);
+  if(round==="Demi-finales" && loser) clear("Petite finale", loser);
+  return changed?updated:koMatches;
+}
+
 // Arbre interactif de la phase finale (tout le tableau d'un coup, façon FIFA)
-function BracketView({preds,results,koMatches,onChangePred,schedule,liveData,admin,onSaveResult,onSetDate,onSetTeams,onSetUnlock,onRemoveMatch}){
+function BracketView({preds,results,koMatches,onChangePred,schedule,liveData,admin,onSaveResult,onClearResult,onSetDate,onSetTeams,onSetUnlock,onRemoveMatch}){
   const [sel,setSel]=useState(null); // match sélectionné (mode joueur) -> {round, m}
   const [ed,setEd]=useState(null); // édition admin -> {round, m, ...champs}
   const koId=(round,i)=>`KO${KO_PREFIX[round]}${i+1}`;
@@ -1130,8 +1157,15 @@ function BracketView({preds,results,koMatches,onChangePred,schedule,liveData,adm
             if(ed.etH!==""&&ed.etA!=="") {extra.etH=+ed.etH; extra.etA=+ed.etA;}
             if(ed.penH!==""&&ed.penA!=="") {extra.penH=+ed.penH; extra.penA=+ed.penA;}
             onSaveResult("ko", ed.m.id, +ed.h, +ed.a, extra);
+          } else if(results.ko?.[ed.m.id]){
+            // Cases vidées → on efface le résultat pour qu'il reste vierge
+            onClearResult && onClearResult(ed.round, ed.m.id);
           }
           setEd(null);
+        };
+        const clearScore=()=>{
+          onClearResult && onClearResult(ed.round, ed.m.id);
+          setEd(p=>({...p,h:"",a:"",etH:"",etA:"",penH:"",penA:""}));
         };
         return (
           <div className="brk-fade" onClick={()=>setEd(null)} style={{position:"fixed",inset:0,background:"rgba(3,6,9,0.9)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
@@ -1160,6 +1194,7 @@ function BracketView({preds,results,koMatches,onChangePred,schedule,liveData,adm
                 <div style={{fontSize:12.5,color:ed.m.unlocked?T.green:T.text,fontWeight:600,lineHeight:1.4}}>{ed.m.unlocked?"🔓 Match rouvert aux pronos":"🔒 Verrouillage automatique (30 min avant)"}</div>
                 <button onClick={()=>{const nv=!ed.m.unlocked; onSetUnlock(ed.round, ed.m.id, nv); setEd(p=>({...p, m:{...p.m, unlocked:nv}}));}} style={{background:ed.m.unlocked?T.green:"#334155",color:ed.m.unlocked?"#031208":"#fff",border:"none",borderRadius:20,padding:"7px 14px",fontWeight:700,fontSize:12,cursor:"pointer",fontFamily:"Inter,sans-serif",flexShrink:0}}>{ed.m.unlocked?"Reverrouiller":"Déverrouiller"}</button>
               </div>
+              {results.ko?.[ed.m.id]&&<button onClick={clearScore} style={{width:"100%",background:"#2a1f14",color:T.gold,border:`1px solid ${T.gold}55`,borderRadius:10,padding:"9px",fontWeight:700,fontSize:12.5,cursor:"pointer",fontFamily:"Inter,sans-serif",marginBottom:8}}>🧹 Effacer le score (laisser vierge)</button>}
               <div style={{display:"flex",gap:8}}>
                 <button onClick={save} style={{flex:1,background:T.green,color:"#031208",border:"none",borderRadius:10,padding:"11px",fontWeight:800,fontSize:14,cursor:"pointer",fontFamily:"Inter,sans-serif"}}>💾 Enregistrer</button>
                 <button onClick={()=>{if(confirm(`Retirer ce match du tableau ?`)){onRemoveMatch(ed.round,ed.m.id);setEd(null);}}} style={{background:"#2a1418",color:T.red,border:`1px solid ${T.red}55`,borderRadius:10,padding:"11px 14px",fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:"Inter,sans-serif",flexShrink:0}}>🗑️</button>
@@ -2149,7 +2184,7 @@ function AdminPage({results,settings,koMatches,players,saveResult,deleteResult,s
 
           {/* 🌳 Arbre interactif (admin) */}
           <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:700,color:T.gold,margin:"4px 0 4px"}}>🌳 Tableau de la phase finale</div>
-          <BracketView preds={{}} results={results} koMatches={koMatches} onChangePred={()=>{}} schedule={SCHEDULE} liveData={liveData||[]} admin={true} onSaveResult={saveResult} onSetDate={updateKoMatchDate} onSetTeams={updateKoMatchTeams} onSetUnlock={updateKoMatchUnlock} onRemoveMatch={removeKoMatch}/>
+          <BracketView preds={{}} results={results} koMatches={koMatches} onChangePred={()=>{}} schedule={SCHEDULE} liveData={liveData||[]} admin={true} onSaveResult={saveResult} onClearResult={(round,id)=>deleteResult("ko",id)} onSetDate={updateKoMatchDate} onSetTeams={updateKoMatchTeams} onSetUnlock={updateKoMatchUnlock} onRemoveMatch={removeKoMatch}/>
 
           {/* 📝 Saisie simple des résultats (liste à plat, sans onglets) */}
           <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:700,color:T.text,margin:"20px 0 4px"}}>📝 Saisie des résultats</div>
@@ -2783,8 +2818,16 @@ function App(){
     } catch(e) { console.log("history snap err",e); }
   };
   const deleteResult=async(type,id)=>{
+    const prev=results[type]?.[id];
     const updated={...results,[type]:{...results[type]}};delete updated[type][id];
     setResults(updated);await ss("results",updated);
+    // Phase finale : retirer le vainqueur qui avait avancé au tour suivant
+    if(type==="ko" && prev){
+      const km=koMatchesRef.current||{};
+      let round=null;
+      for(const r of KO_ROUNDS){ if((km[r]||[]).some(x=>x&&x.id===id)){ round=r; break; } }
+      if(round){ const nk=koUnadvance(km, round, id, prev); if(nk!==km){ setKoMatches(nk); await ss("koMatches", nk); } }
+    }
   };
   const saveSettings=async(upd)=>{
     const ns={...settings,...upd};
