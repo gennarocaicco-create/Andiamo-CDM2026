@@ -2842,9 +2842,8 @@ function App(){
     setKoMatches(updated);await ss("koMatches",updated);
   };
   const updateKoMatchDate=async(round,id,date)=>{
-    let arr=(koMatches[round]||[]).map(m=>m.id===id?{...m,date}:m);
-    // Réordonner le tour par date : le match se replace au bon endroit pour TOUS
-    arr=arr.slice().sort((a,b)=>new Date(a?.date||SCHEDULE[a?.id]||"2100-01-01")-new Date(b?.date||SCHEDULE[b?.id]||"2100-01-01"));
+    // Change juste la date, SANS réordonner (la case garde sa place)
+    const arr=(koMatches[round]||[]).map(m=>m&&m.id===id?{...m,date}:m);
     const updated={...koMatches,[round]:arr};
     setKoMatches(updated);await ss("koMatches",updated);
   };
