@@ -1290,13 +1290,14 @@ function LeaderboardPage({leaderboard,prevLeaderboard,loading,myPseudo,onRefresh
   // déjà joués de ceux qui sont verrouillés mais pas encore commencés.
   const hasKickedOff=(ko)=> ko && new Date() >= new Date(ko);
   const byDate=(a,b)=>{
-    const da=schedule?.[a.id]?new Date(schedule[a.id]).getTime():Infinity;
-    const db=schedule?.[b.id]?new Date(schedule[b.id]).getTime():Infinity;
+    const ad=a.date||schedule?.[a.id], bd=b.date||schedule?.[b.id];
+    const da=ad?new Date(ad).getTime():Infinity;
+    const db=bd?new Date(bd).getTime():Infinity;
     return da-db;
   };
   const lockedGrpMatches=GM.filter(m=>isMatchLocked(schedule?.[m.id])).sort(byDate);
-  // Ordre du tableau (tour puis position) — contrôlé par l'admin via l'échange de cases. Verrou basé sur la VRAIE date du match.
-  const lockedKoMatches=KO_ROUNDS.flatMap(r=>(koMatches?.[r]||[]).filter(m=>m&&isMatchLocked(m.date||schedule?.[m.id])));
+  // Pronos affichés par date croissante (du plus ancien au plus récent), en utilisant la vraie date du match
+  const lockedKoMatches=KO_ROUNDS.flatMap(r=>(koMatches?.[r]||[]).filter(m=>m&&isMatchLocked(m.date||schedule?.[m.id]))).sort(byDate);
   const hasLocked=lockedGrpMatches.length>0||lockedKoMatches.length>0;
 
   const fmtMatchDate=(iso)=>{
@@ -1463,33 +1464,26 @@ function LeaderboardPage({leaderboard,prevLeaderboard,loading,myPseudo,onRefresh
                       );
                     })()}
 
-                    {/* Détail matchs verrouillés */}
-                    {lockedGrpMatches.length>0&&(
-                      <>
-                        <div style={{fontSize:11,fontWeight:600,color:T.muted,letterSpacing:1,marginBottom:8,textTransform:"uppercase"}}>Matchs de groupe lancés</div>
-                        {lockedGrpMatches.map(m=>(
-                          <PredRow key={m.id} label={`${m.h} vs ${m.a}`}
-                            predH={p.preds?.grp?.[m.id]?.h} predA={p.preds?.grp?.[m.id]?.a}
-                            resH={results?.grp?.[m.id]?.h} resA={results?.grp?.[m.id]?.a}
-                            flag1={F[m.h]||"🏳"} flag2={F[m.a]||"🏳"} dateLabel={fmtMatchDate(schedule?.[m.id])} played={hasKickedOff(schedule?.[m.id])}/>
-                        ))}
-                      </>
-                    )}
-                    {lockedKoMatches.length>0&&(
-                      <>
-                        <div style={{fontSize:11,fontWeight:600,color:T.muted,letterSpacing:1,margin:"12px 0 8px",textTransform:"uppercase"}}>Phase finale lancée</div>
-                        {lockedKoMatches.map(m=>(
-                          <PredRow key={m.id} label={`${m.h} vs ${m.a}`}
-                            predH={p.preds?.ko?.[m.id]?.h} predA={p.preds?.ko?.[m.id]?.a}
-                            resH={results?.ko?.[m.id]?.h} resA={results?.ko?.[m.id]?.a}
-                            flag1={F[m.h]||"🏳"} flag2={F[m.a]||"🏳"} dateLabel={fmtMatchDate(m.date||schedule?.[m.id])} played={hasKickedOff(m.date||schedule?.[m.id])}/>
-                        ))}
-                      </>
-                    )}
-                    {!hasLocked&&(
+                    {/* Détail des pronos — uniquement la phase finale, groupée par tour (poules gardées pour les points, non affichées) */}
+                    {KO_ROUNDS.map(r=>{
+                      const ms=(koMatches?.[r]||[]).filter(m=>m&&isMatchLocked(m.date||schedule?.[m.id])).sort(byDate);
+                      if(ms.length===0) return null;
+                      return (
+                        <div key={r}>
+                          <div style={{fontSize:11,fontWeight:700,color:T.gold,letterSpacing:1,margin:"12px 0 8px",textTransform:"uppercase"}}>{r}</div>
+                          {ms.map(m=>(
+                            <PredRow key={m.id} label={`${m.h} vs ${m.a}`}
+                              predH={p.preds?.ko?.[m.id]?.h} predA={p.preds?.ko?.[m.id]?.a}
+                              resH={results?.ko?.[m.id]?.h} resA={results?.ko?.[m.id]?.a}
+                              flag1={F[m.h]||"🏳"} flag2={F[m.a]||"🏳"} dateLabel={fmtMatchDate(m.date||schedule?.[m.id])} played={hasKickedOff(m.date||schedule?.[m.id])}/>
+                          ))}
+                        </div>
+                      );
+                    })}
+                    {lockedKoMatches.length===0&&(
                       <div style={{fontSize:12,color:T.gold,textAlign:"center",padding:"4px 0"}}>
                         🔆 Courbe de {p.pseudo} mise en évidence dans le graphique ci-dessus.
-                        <div style={{fontSize:11,color:T.muted,marginTop:4}}>Les pronostics détaillés seront visibles dès qu'un match sera lancé.</div>
+                        <div style={{fontSize:11,color:T.muted,marginTop:4}}>Les pronostics de phase finale seront visibles dès qu'un match sera lancé.</div>
                       </div>
                     )}
                   </div>
