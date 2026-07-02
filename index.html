@@ -2129,103 +2129,6 @@ function AdminPage({results,settings,koMatches,players,saveResult,deleteResult,s
 
       {adminTab==="knockout"&&(
         <div>
-          {/* 📋 Remettre les 16es dans l'ordre chronologique */}
-          <div style={{background:T.card2,borderRadius:12,padding:14,marginBottom:14,border:`1px solid ${T.border}`}}>
-            <div style={{fontSize:13,color:T.text,lineHeight:1.6,marginBottom:10}}>Ce bouton remet les 16 seizièmes dans l'<b>ordre chronologique</b> (celui dans lequel les joueurs ont pronostiqué), pour que les pronos correspondent au bon match.</div>
-            <button onClick={()=>{if(confirm("Remettre les 16es de finale dans l'ordre chronologique (comme au moment des pronos) ?\n\nCela réordonne les 16 matchs et réinitialise les tours suivants. Les pronostics des participants ne sont PAS effacés — ils se recolleront au bon match."))loadOfficialBracket();}} style={{width:"100%",background:"linear-gradient(135deg,#0e7490,#06b6d4)",color:"#04121a",border:"none",borderRadius:12,padding:"14px",fontWeight:800,fontSize:15,cursor:"pointer",fontFamily:"Inter,sans-serif",boxShadow:"0 4px 14px rgba(6,182,212,0.3)"}}>🔄 Remettre les 16es dans l'ordre chronologique</button>
-          </div>
-
-          {/* 🔁 Récupérer TOUS les scores (fusion des 3 sources) */}
-          <div style={{background:"#0e1f1a",borderRadius:12,padding:14,marginBottom:14,border:`1px solid ${T.green}55`}}>
-            <div style={{fontWeight:800,fontSize:14,color:T.green,marginBottom:6}}>🔁 Récupérer TOUS les scores disparus</div>
-            <div style={{fontSize:12,color:T.muted,lineHeight:1.6,marginBottom:8}}>Les pronos <b>KO</b> abîmés sont dans un des dossiers. Analysez, repérez le dossier qui a le plus de scores <b>KO</b>, puis restaurez les KO depuis celui‑ci (poules et bonus ne bougent pas).</div>
-            <button disabled={remapBusy} onClick={async()=>{
-              setRemapBusy(true); setRemapMsg("Analyse des dossiers…");
-              try{ const {text,folders}=await analyzeFolders(); setFolderList(folders); setRemapMsg("📊 Contenu de chaque dossier :\n"+text); }
-              catch(e){ setRemapMsg("❌ Erreur : "+e.message); }
-              setRemapBusy(false);
-            }} style={{width:"100%",background:"transparent",color:T.green,border:`1px solid ${T.green}66`,borderRadius:10,padding:"10px",fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:"Inter,sans-serif",marginBottom:10}}>🔍 Analyser tous les dossiers (voir où sont les scores)</button>
-            {folderList&&folderList.length>0&&<div style={{marginBottom:10}}>
-              <div style={{fontSize:12,color:T.text,fontWeight:700,marginBottom:6}}>📥 Restaurer les pronos KO depuis :</div>
-              {folderList.map(f=><button key={f.name} disabled={remapBusy||f.ko===0} onClick={async()=>{
-                if(!confirm(`Restaurer les pronos KO de TOUS les participants depuis "${f.name}" (${f.ko} scores KO) ?\n\nLes poules et les bonus ne sont pas touchés.\nUne sauvegarde est faite avant (Annuler dispo).`)) return;
-                setRemapBusy(true); setRemapMsg(`Restauration KO depuis ${f.name}…`);
-                try{ const r=await restoreKoFrom(f.name); setRemapMsg(`✅ KO restaurés depuis "${f.name}" : ${r.scores} scores sur ${r.players} participant(s). Vérifiez le bracket et le classement.`); }
-                catch(e){ setRemapMsg("❌ Erreur : "+e.message); }
-                setRemapBusy(false);
-              }} style={{display:"block",width:"100%",textAlign:"left",background:f.ko===0?T.card2:"#123",color:f.ko===0?T.muted:"#fff",border:`1px solid ${T.border}`,borderRadius:9,padding:"9px 11px",fontWeight:600,fontSize:12.5,cursor:f.ko===0?"default":"pointer",fontFamily:"Inter,sans-serif",marginBottom:6}}>{f.name} — <b style={{color:f.ko>0?T.green:T.muted}}>{f.ko} scores KO</b> ({f.pl} joueurs)</button>)}
-              <button disabled={remapBusy} onClick={async()=>{
-                if(!confirm("Annuler la dernière restauration KO ?")) return;
-                setRemapBusy(true); setRemapMsg("Annulation…");
-                try{ const n=await undoKoRestore(); setRemapMsg(n<0?"⚠️ Rien à annuler.":`↩️ Restauration KO annulée pour ${n} participant(s).`); }
-                catch(e){ setRemapMsg("❌ Erreur : "+e.message); }
-                setRemapBusy(false);
-              }} style={{width:"100%",background:"transparent",color:T.muted,border:`1px solid ${T.border}`,borderRadius:9,padding:"8px",fontWeight:600,fontSize:12,cursor:"pointer",fontFamily:"Inter,sans-serif"}}>↩️ Annuler la restauration KO</button>
-            </div>}
-            <div style={{borderTop:`1px solid ${T.border}`,marginTop:12,paddingTop:12}}>
-              <div style={{fontSize:12,color:T.text,fontWeight:700,marginBottom:4}}>🧹 Nettoyage final</div>
-              <div style={{fontSize:11.5,color:T.muted,lineHeight:1.6,marginBottom:8}}>1️⃣ Regroupe tout dans <b>predictions</b> (le dossier lu par l'app). 2️⃣ Vérifie le classement. 3️⃣ Supprime les sauvegardes. <b>Restaure d'abord les bons KO ci‑dessus si besoin.</b></div>
-              <button disabled={remapBusy} onClick={async()=>{
-                if(!confirm("Regrouper tous les pronos dans le dossier predictions ?\n\nLes pronos actuels de predictions sont gardés, on ajoute ceux qui manquent depuis les sauvegardes.")) return;
-                setRemapBusy(true); setRemapMsg("Regroupement…");
-                try{ const r=await consolidateAll(); setRemapMsg(`✅ Tout regroupé dans predictions : ${r.filled} prono(s) ajouté(s) sur ${r.players} participant(s). Vérifiez le classement AVANT de supprimer.`); }
-                catch(e){ setRemapMsg("❌ Erreur : "+e.message); }
-                setRemapBusy(false);
-              }} style={{width:"100%",background:remapBusy?T.card2:T.green,color:"#031208",border:"none",borderRadius:10,padding:"12px",fontWeight:800,fontSize:14,cursor:remapBusy?"default":"pointer",fontFamily:"Inter,sans-serif",marginBottom:8}}>{remapBusy?"⏳ Patientez…":"1️⃣ 🧹 Tout regrouper dans predictions"}</button>
-              <button disabled={remapBusy} onClick={async()=>{
-                if(!confirm("⚠️ SUPPRIMER TOUS les dossiers de sauvegarde ?\n\nCela efface predictions_backup, predictions_redo, etc. Seul predictions reste.\n\n❌ IRRÉVERSIBLE. Ne le faites QUE si le classement est correct.")) return;
-                if(!confirm("Dernière confirmation : supprimer définitivement toutes les sauvegardes ?")) return;
-                setRemapBusy(true); setRemapMsg("Suppression…");
-                try{ const names=await removeBackupFolders(); setFolderList(null); setRemapMsg(names.length?`🗑️ ${names.length} dossier(s) supprimé(s) : ${names.join(", ")}. Il ne reste que predictions.`:"Aucun dossier de sauvegarde à supprimer."); }
-                catch(e){ setRemapMsg("❌ Erreur : "+e.message); }
-                setRemapBusy(false);
-              }} style={{width:"100%",background:"transparent",color:T.danger||"#e66",border:`1px solid ${T.danger||"#e66"}66`,borderRadius:10,padding:"11px",fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:"Inter,sans-serif"}}>2️⃣ 🗑️ Supprimer tous les dossiers de sauvegarde</button>
-            </div>
-            <div style={{fontSize:12,color:T.muted,lineHeight:1.6,marginBottom:10}}>Fusionne <b>predictions</b> + <b>predictions_backup</b> + <b>predictions_redo</b> pour ne perdre aucun prono. Si des scores <b>diffèrent</b> entre les sources, choisissez qui gagne :</div>
-            <button disabled={remapBusy} onClick={async()=>{
-              if(!confirm("Fusion — priorité aux SAUVEGARDES.\n\nQuand un score diffère entre les sources, on prend celui des sauvegardes (backup/redo). C'est le bon choix si vos scores ont été abîmés dans predictions.\n\nUne sauvegarde est faite avant.")) return;
-              setRemapBusy(true); setRemapMsg("Fusion (priorité sauvegardes)…");
-              try{ const r=await mergeAllPreds("backup"); setRemapMsg(`✅ Fusion terminée : ${r.recovered} prono(s) récupéré(s), ${r.changed} corrigé(s) depuis les sauvegardes, sur ${r.players} participant(s). Vérifiez le classement.`); }
-              catch(e){ setRemapMsg("❌ Erreur : "+e.message); }
-              setRemapBusy(false);
-            }} style={{width:"100%",background:remapBusy?T.card2:T.green,color:"#031208",border:"none",borderRadius:10,padding:"13px",fontWeight:800,fontSize:14.5,cursor:remapBusy?"default":"pointer",fontFamily:"Inter,sans-serif",marginBottom:8}}>{remapBusy?"⏳ Patientez…":"🔁 Fusion — priorité aux sauvegardes"}</button>
-            <button disabled={remapBusy} onClick={async()=>{
-              if(!confirm("Fusion — priorité aux pronos ACTUELS.\n\nOn garde les pronos actuels et on ajoute seulement ceux qui manquent.\n\nUne sauvegarde est faite avant.")) return;
-              setRemapBusy(true); setRemapMsg("Fusion (priorité actuels)…");
-              try{ const r=await mergeAllPreds("current"); setRemapMsg(`✅ Fusion terminée : ${r.recovered} prono(s) ajouté(s) sur ${r.players} participant(s). Vérifiez le classement.`); }
-              catch(e){ setRemapMsg("❌ Erreur : "+e.message); }
-              setRemapBusy(false);
-            }} style={{width:"100%",background:remapBusy?T.card2:"#1e3a4a",color:"#fff",border:`1px solid ${T.green}44`,borderRadius:10,padding:"11px",fontWeight:700,fontSize:13,cursor:remapBusy?"default":"pointer",fontFamily:"Inter,sans-serif",marginBottom:8}}>{remapBusy?"⏳ Patientez…":"🔁 Fusion — priorité aux pronos actuels"}</button>
-            <button disabled={remapBusy} onClick={async()=>{
-              if(!confirm("Annuler la dernière fusion (revenir à l'état d'avant) ?")) return;
-              setRemapBusy(true); setRemapMsg("Annulation…");
-              try{ const n=await revertMerge(); setRemapMsg(n<0?"⚠️ Rien à annuler.":`↩️ Fusion annulée pour ${n} participant(s).`); }
-              catch(e){ setRemapMsg("❌ Erreur : "+e.message); }
-              setRemapBusy(false);
-            }} style={{width:"100%",background:"transparent",color:T.muted,border:`1px solid ${T.border}`,borderRadius:10,padding:"9px",fontWeight:600,fontSize:12.5,cursor:"pointer",fontFamily:"Inter,sans-serif"}}>↩️ Annuler la fusion</button>
-            {remapMsg&&<div style={{fontSize:12,color:T.text,marginTop:10,lineHeight:1.5,background:T.card2,borderRadius:8,padding:"8px 10px",whiteSpace:"pre-wrap"}}>{remapMsg}</div>}
-          </div>
-
-          {/* ↩️ Revenir en arrière / Refaire */}
-          <div style={{background:"#141a20",borderRadius:12,padding:14,marginBottom:14,border:`1px solid ${T.border}`}}>
-            <div style={{fontSize:13,color:T.text,lineHeight:1.6,marginBottom:10}}>Machine à remonter le temps pour les pronos. <b>Revenir en arrière</b> = remet la sauvegarde (predictions_backup) dans les pronos. <b>Refaire</b> = annule ce retour.</div>
-            <button disabled={remapBusy} onClick={async()=>{
-              if(!confirm("Revenir en arrière : remettre la sauvegarde des pronos ?\n\n(L'état actuel est gardé, vous pourrez Refaire.)")) return;
-              setRemapBusy(true); setRemapMsg("Retour en arrière…");
-              try{ const n=await restorePredsBackup(); setRemapMsg(n<0?"⚠️ Aucune sauvegarde trouvée.":`◀️ Sauvegarde remise pour ${n} participant(s). Vérifiez le classement. Pas bon ? → Refaire.`); }
-              catch(e){ setRemapMsg("❌ Erreur : "+e.message); }
-              setRemapBusy(false);
-            }} style={{width:"100%",background:remapBusy?T.card2:"#334155",color:"#fff",border:"none",borderRadius:10,padding:"12px",fontWeight:700,fontSize:14,cursor:remapBusy?"default":"pointer",fontFamily:"Inter,sans-serif",marginBottom:8}}>{remapBusy?"⏳ Patientez…":"◀️ Revenir en arrière (remettre la sauvegarde)"}</button>
-            <button disabled={remapBusy} onClick={async()=>{
-              if(!confirm("Refaire : annuler le retour en arrière ?")) return;
-              setRemapBusy(true); setRemapMsg("Rétablissement…");
-              try{ const n=await redoPreds(); setRemapMsg(n<0?"⚠️ Rien à refaire (il faut d'abord Revenir en arrière).":`▶️ Rétabli pour ${n} participant(s).`); }
-              catch(e){ setRemapMsg("❌ Erreur : "+e.message); }
-              setRemapBusy(false);
-            }} style={{width:"100%",background:"transparent",color:T.muted,border:`1px solid ${T.border}`,borderRadius:10,padding:"10px",fontWeight:600,fontSize:13,cursor:"pointer",fontFamily:"Inter,sans-serif"}}>▶️ Refaire (annuler le retour)</button>
-            {remapMsg&&<div style={{fontSize:12,color:T.text,marginTop:10,lineHeight:1.5,background:T.card2,borderRadius:8,padding:"8px 10px",whiteSpace:"pre-wrap"}}>{remapMsg}</div>}
-          </div>
-
           {/* 🌳 Arbre interactif (admin) */}
           <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:700,color:T.gold,margin:"4px 0 4px"}}>🌳 Tableau de la phase finale</div>
           <BracketView preds={{}} results={results} koMatches={koMatches} onChangePred={()=>{}} schedule={SCHEDULE} liveData={liveData||[]} admin={true} onSaveResult={saveResult} onClearResult={(round,id)=>deleteResult("ko",id)} onSetDate={updateKoMatchDate} onSetTeams={updateKoMatchTeams} onSetUnlock={updateKoMatchUnlock} onSetLock={setKoLockState} onRemoveMatch={removeKoMatch} onSwap={swapKoMatches}/>
@@ -2236,7 +2139,7 @@ function AdminPage({results,settings,koMatches,players,saveResult,deleteResult,s
           {koSwapSel&&<div style={{fontSize:11.5,color:T.green,marginBottom:8,textAlign:"center",fontWeight:600,background:"#0e1f1a",borderRadius:8,padding:"7px 10px",border:`1px solid ${T.green}55`}}>Match choisi. Touche le 🔀 d'un autre match du <b>même tour</b> pour échanger.</div>}
           {(()=>{
             const anyKo=KO_ROUNDS.some(r=>(koMatches?.[r]||[]).some(m=>m&&m.h&&m.a));
-            if(!anyKo) return <div style={{textAlign:"center",color:T.muted,padding:20,fontSize:14,background:T.card2,borderRadius:12,border:`1px solid ${T.border}`}}>Cliquez sur <b style={{color:T.gold}}>📋 Charger le tableau officiel</b> ci-dessus.<br/>Les matchs à saisir apparaîtront ici.</div>;
+            if(!anyKo) return <div style={{textAlign:"center",color:T.muted,padding:20,fontSize:14,background:T.card2,borderRadius:12,border:`1px solid ${T.border}`}}>Le tableau de la phase finale n'est pas encore rempli.<br/>Les matchs à saisir apparaîtront ici.</div>;
             return KO_ROUNDS.map(r=>{
               const arr=koMatches?.[r]||[];
               const rows=arr.map((m,idx)=>({m,idx})).filter(x=>x.m&&x.m.h&&x.m.a);
