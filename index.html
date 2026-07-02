@@ -1100,6 +1100,11 @@ function BracketView({preds,results,koMatches,onChangePred,schedule,liveData,adm
     const lT=m?(flip?m.a:m.h):null, rT=m?(flip?m.h:m.a):null;
     const pH=pred?(flip?pred.a:pred.h):"", pA=pred?(flip?pred.h:pred.a):"";
     const hasPred=pH!==""&&pH!=null&&pA!==""&&pA!=null;
+    // En mode admin : afficher le score RÉEL saisi (90 min) directement dans la case
+    const rH=result?(flip?result.a:result.h):null, rA=result?(flip?result.h:result.a):null;
+    const hasResult=rH!=null&&rH!==""&&rA!=null&&rA!=="";
+    const showH=admin?(hasResult?rH:""):(hasPred?pH:"");
+    const showA=admin?(hasResult?rA:""):(hasPred?pA:"");
     const pts=(bothKnown&&result&&pred&&pred.h!=null&&pred.h!=="")?matchPts(pred,result):null;
     const locked=date&&isMatchLocked(date)&&!m?.unlocked;
     const bc=pts===2?T.green:pts===1?T.blue:pts===0?T.red:(locked?"#f97316":T.border);
@@ -1115,9 +1120,9 @@ function BracketView({preds,results,koMatches,onChangePred,schedule,liveData,adm
         style={{width:"100%",textAlign:"left",background:isSwapSel?"#1a2f22":(m?T.card:"#0a0f17"),border:`${isSwapSel?2.5:1.5}px solid ${isSwapSel?T.green:swapArmed?T.gold+"99":bc}`,borderRadius:9,padding:"5px 7px",cursor:canTap?"pointer":"default",opacity:canTap?1:0.5,position:"relative",fontFamily:"Inter,sans-serif",transition:"transform 0.1s",boxShadow:isSwapSel?`0 0 0 3px ${T.green}33`:"none"}}>
         {isSwapSel&&<div style={{position:"absolute",top:-8,left:-6,background:T.green,color:"#031208",fontSize:9,fontWeight:800,borderRadius:6,padding:"1px 5px",zIndex:2}}>🔀 choisie</div>}
         {(date||decidedBy)&&<div style={{fontSize:8,color:live?.isLive?"#22c55e":decidedBy?"#a78bfa":T.muted,marginBottom:3,fontWeight:600,letterSpacing:0.2,textAlign:"center"}}>{live?.isLive?"🔴 ":""}{fmtC(date)}{decidedBy?` · ${decidedBy}`:""}</div>}
-        <TeamLine flag={F[lT]} name={shortT(lT)} score={hasPred?pH:""} win={wL}/>
+        <TeamLine flag={F[lT]} name={shortT(lT)} score={showH} win={wL}/>
         <div style={{height:3}}/>
-        <TeamLine flag={F[rT]} name={shortT(rT)} score={hasPred?pA:""} win={wR}/>
+        <TeamLine flag={F[rT]} name={shortT(rT)} score={showA} win={wR}/>
         {pts!=null&&<div style={{position:"absolute",top:-7,right:-6,background:bc,color:"#030609",fontSize:9,fontWeight:800,borderRadius:6,padding:"1px 4px"}}>{pts===2?"+2":pts===1?"+1":"0"}</div>}
         {hasPred&&pts==null&&!locked&&<div style={{position:"absolute",top:-7,right:-6,background:T.gold,color:"#030609",fontSize:8,fontWeight:800,borderRadius:6,padding:"1px 4px"}}>✓</div>}
       </button>
