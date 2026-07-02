@@ -2034,9 +2034,9 @@ function AdminPage({results,settings,koMatches,players,saveResult,deleteResult,s
     setSyncing(false);
   };
 
-  const RRow=({type,id,home,away,ko})=>{
+  const RRow=({type,id,home,away,ko,date})=>{
     const has=!!results[type]?.[id];
-    const kickoff=SCHEDULE[id];
+    const kickoff=date||SCHEDULE[id];
     const miniInput=(field)=>(
       <input type="number" min="0" max="40" value={getV(type,id,field)} onChange={e=>setV(type,id,field,e.target.value)} style={{width:34,background:"#0c1422",border:`1px solid ${T.border}`,borderRadius:6,padding:"4px 0",color:"#fff",fontSize:14,fontWeight:700,textAlign:"center",outline:"none",fontFamily:"Inter,sans-serif"}}/>
     );
@@ -2238,7 +2238,7 @@ function AdminPage({results,settings,koMatches,players,saveResult,deleteResult,s
                           if(koSwapSel.round!==r){ setKoSwapSel({round:r,idx}); return; }
                           swapKoMatches(r,koSwapSel.idx,idx); setKoSwapSel(null);
                         }} title="Échanger de place" style={{flexShrink:0,width:44,background:isSel?T.green:"#2a1f14",color:isSel?"#031208":T.gold,border:`1px solid ${isSel?T.green:T.gold+"55"}`,borderRadius:10,fontSize:isSel?10:16,fontWeight:800,cursor:"pointer",fontFamily:"Inter,sans-serif",lineHeight:1.1,padding:"0 2px"}}>{isSel?"choisi":"🔀"}</button>
-                        <div style={{flex:1,minWidth:0}}><RRow type="ko" id={m.id} home={m.h} away={m.a} ko={true}/></div>
+                        <div style={{flex:1,minWidth:0}}><RRow type="ko" id={m.id} home={m.h} away={m.a} ko={true} date={m.date}/></div>
                       </div>
                     );
                   })}
